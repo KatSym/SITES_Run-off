@@ -35,7 +35,8 @@ master.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx",
 
 # for some reason all number columns are characters. Let's convert that 
 master.dat[,14:20] <- lapply(master.dat[,14:20], as.numeric)
-
+master.dat$Mesocosm <- as.factor(master.dat$Mesocosm)
+master.dat$Mes_ID <- as.factor(master.dat$Mes_ID)
 
 # some basic cleaning - wrangling
 partial_dat <- master.dat %>% 
@@ -47,7 +48,11 @@ partial_dat <- master.dat %>%
 # calculate ingestion rates - NOW IT'S COUNTS
                 Mir = FLBinMF_total / (MF * 0.5),
                 Hir = FLBinHF_total / (HFwFLB * 0.5),
-                Vol = Fields_counted * V * 1e3) %>% 
+                Vol = Fields_counted * V * 1e3,
+# calculate abundances
+                aHF = HF_total/Vol,
+                aMF = MF/Vol, 
+                aPF = PF/Vol) %>% 
   
 # filter for Incubation 2 and T30 
   
@@ -72,18 +77,63 @@ partial_dat %>%
 
 ```
 
-```{r abund hist, message=FALSE}
+```{r abund hist, eval=F, message=FALSE}
 
 partial_dat %>% 
-  mutate(aHF = HF_total/Vol,
-         aMF = MF/Vol, 
-         aPF = PF/Vol) %>% 
   pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>% 
   ggplot(., aes(x = abundance)) + 
   geom_histogram() + 
   facet_grid(cols = vars(group))
 
 ```
+
+```{r, eval=F}
+
+mean.mes <- partial_dat %>% 
+  pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>% 
+  group_by(
+    # Incubation,
+    Treatment,
+    Mes_ID,
+    group) %>% 
+  summarise(mean = mean(abundance), 
+            sd = sd(abundance))
+
+mean.trt <- partial_dat %>% 
+  pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>% 
+  group_by(
+    # Incubation,
+    Treatment,
+    group) %>% 
+  summarise(mean = mean(abundance), 
+            sd = sd(abundance))
+
+ggplot(mean.trt, aes(x=Treatment, y=mean)) +
+  geom_point()+
+  geom_point(mean.mes, aes(x=mean.mes$Treatment, y=mean.mes$mean, fill=mean.mes$Mes_ID))+
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd),
+                width=.2,
+                position = position_dodge(0.05)) +
+    facet_grid(cols = vars(group))
+
+```
+
+
+```{r}
+
+partial_dat %>% 
+  pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>% 
+  ggplot(., aes(x = Treatment, y = abundance)) +
+  geom_boxplot() +
+  geom_point(aes(x = Treatment, y = abundance, colour = Mes_ID),
+             position = "jitter", 
+             alpha = 0.4,
+             # shape = 1, stroke = 0.7
+             ) +
+  # geom_jitter(size =.4, alpha = .5) + 
+  facet_grid(cols = vars(group))
+```
+
 
 ### Serious stats {.tabset}
 
@@ -106,13 +156,15 @@ hm = glmmTMB(HF_total/Vol ~ 1
 
 #check_model(hm) # why error????
 
-plot(ggpredict(hm, terms = c("Treatment")))
+h.pred <- ggpredict(hm, terms = c("Treatment"))
+
+plot(h.pred)
 # simulateResiduals(fittedModel = hm, plot = T)
 
 ```
 
-*Something else to try*  
-influence measures  
+*Something else to try*\
+influence measures\
 quantify the effects of particular observations, or groups of observations, on the results of a statistical model
 
 ```{r}
@@ -141,8 +193,7 @@ plot(ggpredict(mm, terms = c("Treatment")))
 
 ```
 
-  
-influence measures  
+influence measures
 
 ```{r}
 source(system.file("other_methods","influence_mixed.R", package="glmmTMB"))
@@ -170,8 +221,7 @@ plot(ggpredict(pm, terms = c("Treatment")))
 
 ```
 
-  
-influence measures  
+influence measures
 
 ```{r}
 source(system.file("other_methods","influence_mixed.R", package="glmmTMB"))
@@ -200,29 +250,14 @@ For some reason there is a difference if I use `Mesocosm` or `Mes_ID` for the ra
 | Groups Name        | Variance | Std.Dev   |
 | Mes_ID (Intercept) | 2.26e-09 | 4.754e-05 |
 
-
-
-
-
-
 ##The Bayes way
 
-# ```{r}
+# \`\`\`{r}
+
 library(brms)
 
-mb = brm(bf(HF_total/Vol ~ 0
-            + Treatment 
-            + (1|Mesocosm)),
-         chains = 4,
-         iter = 20000,
-         cores = 4,
-         adapt_delta = 0.99,
-         backend = "cmdstanr", 
-         data = partial_dat)
+mb = brm(bf(HF_total/Vol \~ 0 + Treatment + (1\|Mesocosm)), chains = 4, iter = 20000, cores = 4, adapt_delta = 0.99, backend = "cmdstanr", data = partial_dat)
 
-pp_check(mb, ndraws = 1e2)
-plot(mb)
-summary(mb)
+pp_check(mb, ndraws = 1e2) plot(mb) summary(mb)
 
-plot(conditional_effects(mb), ask = FALSE)
-```
+plot(conditional_effects(mb), ask = FALSE) \`\`\`
