@@ -1,5 +1,5 @@
 ---
-title: "Notes on statistican analysis"
+title: "Notes on statistical analysis"
 author: "Katerina Symiakaki"
 date: "Created on 13/12/2022. Last update on `r format(Sys.time(), '%d/%m/%Y')`."
 output: html_document
@@ -10,10 +10,10 @@ Here I plan to write what I try and don't try for the analysis of data from the 
 Data produced from microscope counts. Magnification always 1000x. Count to about 100 cells total. Count only what is inside the square area in the ocular lens. Sides of the square are 100 microns. **NEED TO CHECK THAT**
 
 Area of square = 0.1 \* 0.1 (mm)\
-Area of the filter = pi \* (25/2)\^2 (filter diameter is 25 mm)\
+Area of the filter = pi \* (25/2)^2^ (filter diameter is 25 mm)\
 Volume filtered = 10 mL
 
-The volume that I examined is (in mL):
+The volume of 1 field of view is (in mL):
 
 ```{r}
 V = (0.1 * 0.1 * 10) / (pi * (25/2)^2)
@@ -24,7 +24,7 @@ library(tidyverse)
 library(readxl)
 ```
 
-Load data  
+Load data\
 *The range specified includes ALL 0.8 samples. It will fill up as more get analyzed, but for now just filter the area you need*
 
 ```{r, message=FALSE, warning=FALSE}
@@ -48,7 +48,9 @@ partial_dat <- master.dat %>%
                 Mir = FLBinMF_total / (MF * 0.5),
                 Hir = FLBinHF_total / (HFwFLB * 0.5),
                 Vol = Fields_counted * V * 1e3) %>% 
+  
 # filter for Incubation 2 and T30 
+  
                 filter(Incubation == 2 & Time_point == "Tend") %>% 
                 drop_na()
 
@@ -59,12 +61,25 @@ partial_dat <- master.dat %>%
 do some stats\
 Histogram with the distribution of counts
 
-```{r, message=FALSE}
+```{r count hist, message=FALSE}
 summary(partial_dat)
 
 partial_dat %>% 
   pivot_longer(cols = c(HF_total, PF, MF), names_to = "group", values_to = "counts") %>% 
   ggplot(., aes(x = counts)) + 
+  geom_histogram() + 
+  facet_grid(cols = vars(group))
+
+```
+
+```{r abund hist, message=FALSE}
+
+partial_dat %>% 
+  mutate(aHF = HF_total/Vol,
+         aMF = MF/Vol, 
+         aPF = PF/Vol) %>% 
+  pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>% 
+  ggplot(., aes(x = abundance)) + 
   geom_histogram() + 
   facet_grid(cols = vars(group))
 
@@ -85,8 +100,8 @@ library(DHARMa)
 hm = glmmTMB(HF_total/Vol ~ 1
             + Treatment 
             + (1|Mesocosm),
-            # offset = log(Fields_counted),
-            family = nbinom2(),
+            # offset = log(Vol),
+            family = gaussian(link=log),
             data = partial_dat);summary(hm)
 
 #check_model(hm) # why error????
@@ -96,6 +111,18 @@ plot(ggpredict(hm, terms = c("Treatment")))
 
 ```
 
+*Something else to try*  
+influence measures  
+quantify the effects of particular observations, or groups of observations, on the results of a statistical model
+
+```{r}
+source(system.file("other_methods","influence_mixed.R", package="glmmTMB"))
+# hm_inf_time <- system.time(
+hm_inf <- influence_mixed(hm, groups="Mesocosm")
+# )
+
+car::infIndexPlot(hm_inf)
+```
 
 #### Mixotrophic
 
@@ -104,7 +131,7 @@ mm = glmmTMB(MF/Vol ~ 1
             + Treatment 
             + (1|Mesocosm),
             # offset = log(Fields_counted),
-            family = nbinom2(),
+            family = gaussian(link=log),
             data = partial_dat);summary(mm)
 
 #check_model(mm) # why error????
@@ -114,6 +141,18 @@ plot(ggpredict(mm, terms = c("Treatment")))
 
 ```
 
+  
+influence measures  
+
+```{r}
+source(system.file("other_methods","influence_mixed.R", package="glmmTMB"))
+# hm_inf_time <- system.time(
+mm_inf <- influence_mixed(mm, groups="Mesocosm")
+# )
+
+car::infIndexPlot(mm_inf)
+```
+
 #### Phototrophic
 
 ```{r}
@@ -121,7 +160,7 @@ pm = glmmTMB(PF/Vol ~ 1
             + Treatment 
             + (1|Mesocosm),
             # offset = log(Fields_counted),
-            family = nbinom2(),
+            family = gaussian(link=log),
             data = partial_dat);summary(pm)
 
 #check_model(pm) # why error????
@@ -129,6 +168,18 @@ pm = glmmTMB(PF/Vol ~ 1
 plot(ggpredict(pm, terms = c("Treatment")))
 # simulateResiduals(fittedModel = pm, plot = T)
 
+```
+
+  
+influence measures  
+
+```{r}
+source(system.file("other_methods","influence_mixed.R", package="glmmTMB"))
+# hm_inf_time <- system.time(
+pm_inf <- influence_mixed(pm, groups="Mesocosm")
+# )
+
+car::infIndexPlot(pm_inf)
 ```
 
 ###  {.unnumbered}
@@ -149,7 +200,12 @@ For some reason there is a difference if I use `Mesocosm` or `Mes_ID` for the ra
 | Groups Name        | Variance | Std.Dev   |
 | Mes_ID (Intercept) | 2.26e-09 | 4.754e-05 |
 
-The Bayes way
+
+
+
+
+
+##The Bayes way
 
 # ```{r}
 library(brms)
