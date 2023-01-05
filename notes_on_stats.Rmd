@@ -7,7 +7,7 @@ output: html_document
 
 Here I plan to write what I try and don't try for the analysis of data from the experiment in Sweden.
 
-Data produced from microscope counts. Magnification always 1000x. Count to about 100 cells total. Count only what is inside the square area in the ocular lens. Sides of the square are 100 microns. **NEED TO CHECK THAT**
+Data produced from microscope counts. Magnification always 1000x. Count to about 100 cells total. Count only what is inside the square area in the ocular lens. Sides of the square are 100 microns.
 
 Area of square = 0.1 \* 0.1 (mm)\
 Area of the filter = pi \* (25/2)^2^ (filter diameter is 25 mm)\
@@ -16,7 +16,7 @@ Volume filtered = 10 mL
 The volume of 1 field of view is (in mL):
 
 ```{r}
-V = (0.1 * 0.1 * 10) / (pi * (25/2)^2)
+V = 10 * (0.1 * 0.1) / (pi * (21/2)^2)
 ```
 
 ```{r, echo=F, message=F, warning=F}
@@ -48,9 +48,9 @@ partial_dat <- master.dat %>%
 # calculate ingestion rates - NOW IT'S COUNTS
                 Mir = FLBinMF_total / (MF * 0.5),
                 Hir = FLBinHF_total / (HFwFLB * 0.5),
-                Vol = Fields_counted * V * 1e3,
+                Vol = Fields_counted * V,
 # calculate abundances
-                aHF = HF_total/Vol,
+                aHF = as.integer(as.character(HF_total/Vol)),
                 aMF = MF/Vol, 
                 aPF = PF/Vol) %>% 
   
@@ -130,7 +130,7 @@ partial_dat %>%
              alpha = 0.4,
              # shape = 1, stroke = 0.7
              ) +
-  # geom_jitter(size =.4, alpha = .5) + 
+  ylab("Abundance cells/mL")+
   facet_grid(cols = vars(group))
 ```
 
@@ -145,21 +145,22 @@ GLMM
 
 library(glmmTMB)
 library(ggeffects)
+library(performance)
 library(DHARMa)
 
-hm = glmmTMB(HF_total/Vol ~ 1
+hm = glmmTMB(aHF ~ 1
             + Treatment 
             + (1|Mesocosm),
-            # offset = log(Vol),
-            family = gaussian(link=log),
+            # offset = Vol,
+            family = poisson(),
             data = partial_dat);summary(hm)
 
-#check_model(hm) # why error????
+check_model(hm) # why error????
 
 h.pred <- ggpredict(hm, terms = c("Treatment"))
 
 plot(h.pred)
-# simulateResiduals(fittedModel = hm, plot = T)
+ # simulateResiduals(fittedModel = hm, plot = T)
 
 ```
 
@@ -179,17 +180,17 @@ car::infIndexPlot(hm_inf)
 #### Mixotrophic
 
 ```{r}
-mm = glmmTMB(MF/Vol ~ 1
+mm = glmmTMB(aMF ~ 1
             + Treatment 
             + (1|Mesocosm),
             # offset = log(Fields_counted),
-            family = gaussian(link=log),
+            family = poisson(),
             data = partial_dat);summary(mm)
 
-#check_model(mm) # why error????
+check_model(mm) # why error????
 
 plot(ggpredict(mm, terms = c("Treatment")))
-# simulateResiduals(fittedModel = mm, plot = T)
+# plot(simulateResiduals(fittedModel = mm))
 
 ```
 
@@ -207,14 +208,14 @@ car::infIndexPlot(mm_inf)
 #### Phototrophic
 
 ```{r}
-pm = glmmTMB(PF/Vol ~ 1
+pm = glmmTMB(aPF ~ 1
             + Treatment 
             + (1|Mesocosm),
             # offset = log(Fields_counted),
-            family = gaussian(link=log),
+            family = poisson(),
             data = partial_dat);summary(pm)
 
-#check_model(pm) # why error????
+check_model(pm) # why error????
 
 plot(ggpredict(pm, terms = c("Treatment")))
 # simulateResiduals(fittedModel = pm, plot = T)
@@ -252,12 +253,27 @@ For some reason there is a difference if I use `Mesocosm` or `Mes_ID` for the ra
 
 ##The Bayes way
 
-# \`\`\`{r}
+```{r, eval=F}
 
 library(brms)
 
-mb = brm(bf(HF_total/Vol \~ 0 + Treatment + (1\|Mesocosm)), chains = 4, iter = 20000, cores = 4, adapt_delta = 0.99, backend = "cmdstanr", data = partial_dat)
+mb = brm(bf(aHF ~ Treatment 
+            + (1|Mesocosm)),
+            # + offset(log(Fields_counted))),
+         family = gaussian(link = "log"),
+         chains = 4,
+         iter = 2000,
+         cores = 4,
+         backend = "cmdstanr", 
+         data = partial_dat)
 
-pp_check(mb, ndraws = 1e2) plot(mb) summary(mb)
+pp_check(mb, ndraws = 1e2) 
+plot(mb) 
+summary(mb)
 
-plot(conditional_effects(mb), ask = FALSE) \`\`\`
+
+
+plot(conditional_effects(mb), ask = FALSE) 
+```
+
+integer-gaussian > numeric-gaussian > integer-poisson
