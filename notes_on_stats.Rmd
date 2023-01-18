@@ -10,13 +10,13 @@ Here I plan to write what I try and don't try for the analysis of data from the 
 Data produced from microscope counts. Magnification always 1000x. Count to about 100 cells total. Count only what is inside the square area in the ocular lens. Sides of the square are 100 microns.
 
 Area of square = 0.1 \* 0.1 (mm)\
-Area of the filter = pi \* (25/2)^2^ (filter diameter is 25 mm)\
+Area of the filter = pi \* (21/2)^2^ (filter diameter is 25 mm)\
 Volume filtered = 10 mL
 
 The volume of 1 field of view is (in mL):
 
 ```{r}
-V = 10 * (0.1 * 0.1) / (pi * (21/2)^2)
+Vp = 10 * (0.1 * 0.1) / (pi * (21/2)^2)
 ```
 
 ```{r, echo=F, message=F, warning=F}
@@ -48,7 +48,7 @@ partial_dat <- master.dat %>%
 # calculate ingestion rates - NOW IT'S COUNTS
                 Mir = FLBinMF_total / (MF * 0.5),
                 Hir = FLBinHF_total / (HFwFLB * 0.5),
-                Vol = Fields_counted * V,
+                Vol = Fields_counted * Vp,
 # calculate abundances
                 aHF = as.integer(as.character(HF_total/Vol)),
                 aMF = MF/Vol, 
@@ -277,3 +277,15 @@ plot(conditional_effects(mb), ask = FALSE)
 ```
 
 integer-gaussian > numeric-gaussian > integer-poisson
+
+# Ingestion rates
+
+For the bacterial counts I have:  
+Area of square = 0.05 \* 0.05 (mm)\
+Area of the filter = pi \* (21/2)^2^ (filter diameter is 25 mm)\
+Volume filtered = 5 mL
+
+The volume of 1 field of view is (in mL):
+
+```{r}
+Vb = 5 * (0.05 * 0.05) / (pi * (21/2)^2)
