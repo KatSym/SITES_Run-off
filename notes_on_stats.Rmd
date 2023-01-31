@@ -42,8 +42,8 @@ mes.cols <- c(`1` = "#333333", `7` = "#000000", `16` = "#b3b3b3", #black - C
 group_names <- as_labeller(c(`aHF` = "Heterotrophs",
                              `aMF` = "Mixotrophs",
                              `aPF` = "Phototrophs"))
-group_ir <- as_labeller(c(`Hir` = "Heterotrophs",
-                             `Mir` = "Mixotrophs"))
+group_ir <- as_labeller(c(`HFir` = "Heterotrophs",
+                          `MFir` = "Mixotrophs"))
 ```
 
 Load data\
@@ -311,9 +311,9 @@ plot(conditional_effects(mb), ask = FALSE)
 
 integer-gaussian \> numeric-gaussian \> integer-poisson
 
-#Ingestion rates
 
-## Bacterial counts
+
+# Bacterial counts
 
 The factor to calculate the abundance (volume of 1 field of view) is now different for each sample, depending on how I counted. The volume filtered for all samples is 5 mL and the filter area is the same, diameter of 21 mm.
 
@@ -336,7 +336,8 @@ bact.dat$Mesocosm <- as.factor(bact.dat$Mesocosm)
 bact.dat$Mes_ID <- as.factor(bact.dat$Mes_ID)
 ```
 
-```{r}
+Plot
+```{r bact plot}
 bact.dat %>% 
   pivot_longer(cols = c(HB_abund, FLB_abund, CY_abund), names_to = "group", values_to = "abundance") %>% 
   ggplot(., aes(x = Treatment, y = abundance)) +
@@ -356,29 +357,13 @@ bact.dat %>%
         strip.text.x = element_text(size= 12))
 ```
 
-If I just make a model with the number of ingested bacteria as a response variable, and have the data of occurrences (ie cells) what is the offset?
+The % of FLB is in most cases (incubation 2) < 10% of the community. This is not good and may explain why I have few ingestions overall. Sherr & Sherr 1993 suggest at least 2*10^6 FLB for incubations with flagellates.
 
-**Need to standardize the ingestion rates somehow. I have \~ 100 cells in each sample but mot exactly**
-
-some ingestion rate dataframes
-```{r, echo=F}
-trt.mean.ir <- partial_dat %>% 
-  pivot_longer(cols = c(Mir, Hir), names_to = "group", values_to = "ingest_rates") %>% 
-  group_by(Treatment, group) %>% 
-  summarise(trt.mean = mean(ingest_rates), 
-            trt.sd = sd(ingest_rates))
-
-
-mes.mean.ir <- partial_dat %>% 
-  pivot_longer(cols = c(Mir, Hir), names_to = "group", values_to = "ingest_rates") %>% 
-  group_by(Treatment, Mes_ID, group) %>% 
-  summarise(mean = mean(ingest_rates), 
-            sd = sd(ingest_rates)) 
-```
+# Ingestion rates
 
 Plot Ingestion rate - not corrected
 
-```{r}
+```{r, eval=FALSE}
 partial_dat %>% 
   pivot_longer(cols = c(Mir, Hir), names_to = "group", values_to = "ingest_rates") %>% 
   ggplot(., aes(x = Treatment, y = ingest_rates)) +
@@ -411,20 +396,20 @@ partial_dat %>%
 
 ```
 
-### Correcting ingestion rates
+## Correcting ingestion rates
 
 I want to calculate -and plot- the "corrected" ingestion rates several (or as many possible) ways
 
 1.  The "traditional" method\
 
-```{r}
+```{r ingestion data, message=F}
 ingest <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
                         sheet = 3,  
                         range = "A1:L2233", # change accordingly
                         col_names = T) 
 
 working <- ingest %>% 
-  group_by(Treatment, Mes_ID, Sample, Time_point, Grazer) %>% 
+  group_by(Treatment, Mes_ID, Sample, Replicate, Time_point, Grazer) %>% 
   summarise(cell_num = sum(FLB_presence),
             flb_ingest = sum(Num_FLB, na.rm = T)) %>% # pay attention here! what's happening with the NAs?
   ungroup() %>% 
@@ -435,13 +420,26 @@ working <- ingest %>%
   mutate(MF_corr = cell_num_Tend_MF - cell_num_Tstart_MF,
          HF_corr = cell_num_Tend_HF - cell_num_Tstart_HF,
          HFir = flb_ingest_Tend_HF/(HF_corr*0.5),
-         MFir = flb_ingest_Tend_MF/(MF_corr*0.5)) %>% 
-  select(-contains("cell_num_T"), -contains("Tstart")) 
+         MFir = flb_ingest_Tend_MF/(MF_corr*0.5),
+         Treatment = fct_relevel(Treatment, c("C","D","I","E"))) %>% 
+  select(-contains(c("cell_num_T", "Tstart", "flb_ingest"))) 
 
-#maybe need to replace with 0, will see
-working[sapply(working, is.infinite)] <- NA
+working$Mes_ID <- as.factor(working$Mes_ID)
 
+#if I replace with NA it gives NA in the summary
+working[sapply(working, is.infinite)] <- 0
 
+grazing =  left_join(working, bact.dat, by = c("Treatment", "Mes_ID", "Replicate"), copy = T) %>% 
+  select(-c(9:20), -FLB_abund, -CY_abund) %>% 
+  mutate(mCR = MFir/HB_abund, # in mL
+         hCR = HFir/HB_abund)
+
+# for plotting
+sumIR <- working %>% 
+  pivot_longer(cols = c(MFir, HFir), names_to = "group", values_to = "IR") %>% 
+  group_by(Treatment, group) %>% 
+  summarise(IR.mean = mean(IR), 
+            IR.sd = sd(IR))
 
 # work in progress - I want to remove the cells that have the same number of flb in the start and end
 working <- ingest %>% 
@@ -457,8 +455,67 @@ working <- ingest %>%
   select(-contains("cell_num_T"))
 ```
 
+Plot the thing
+```{r}
+working %>% 
+  pivot_longer(cols = c(MFir, HFir), names_to = "group", values_to = "IR") %>% 
+  ggplot(., aes(x = Treatment, y = IR)) +
+  facet_grid(cols = vars(group), 
+             labeller = group_ir)+
+  # geom_boxplot(alpha = 0.8) +
+  geom_point(aes(color = Mes_ID),
+             position = "jitter", 
+             alpha = 0.5,
+             # shape = 1, stroke = 0.7
+  ) +
+  scale_color_manual(values = mes.cols)+
+  geom_point(aes(color = Treatment), stat = "summary", fun = "mean",size = 4)+
+  geom_pointrange(data =sumIR,
+             aes(x = sumIR$Treatment,
+                 y = sumIR$IR.mean,
+                 ymin=sumIR$IR.mean-sumIR$IR.sd,
+                 ymax=sumIR$IR.mean+sumIR$IR.sd,
+                fill = sumIR$Treatment),
+             size = .6, stat = "identity", show.legend = F)+
+  # geom_pointrange(stat = "summary", fun.y = mean, 
+  #                 fun.ymin = mean-sd, fun.yman = mean+sd)
+  scale_fill_manual(values = trt.cols)+
+  ylab(expression("Ingestion rate"~"bacteria" ~ "cells"^{-1} ~"h"^{-1}))+
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey96"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))
+```
+possible outliers for MF: E1a (4), I1a (3), D3a (11) - the 0  
+possible outliers for HF: I3c (12) - the 0, D2c (8)  
+
 2.  The "growth rate" method
 
 ```{r}
 
 ```
+
+If I just make a model with the number of ingested bacteria as a response variable, and have the data of occurrences (ie cells) what is the offset?
+
+**Need to standardize the ingestion rates somehow. I have \~ 100 cells in each sample but mot exactly**
+
+## Statistics 
+```{r}
+ir.stat = grazing %>% 
+  filter(Bag!="E1a" & Bag!="I1a")
+
+
+IR.mod = glmmTMB(MFir ~ 1
+            + Treatment 
+            + (1|Mes_ID),
+            # offset = log(Fields_counted),
+            family = gaussian(),
+            data = ir.stat);summary(IR.mod)
+
+check_model(IR.mod) # why error????
+
+plot(ggpredict(IR.mod, terms = c("Treatment")))
+plot(simulateResiduals(fittedModel = IR.mod))
+```
+Model diagnostics are better when omitting the outliers (use the ir.stat dataframe). "Better" significance if not.
