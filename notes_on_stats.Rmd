@@ -88,7 +88,6 @@ partial_dat <- master.dat %>%
 
 # EDA
 
-do some stats\
 Histogram with the distribution of counts
 
 ```{r count hist, message=FALSE, eval = F}
@@ -145,8 +144,8 @@ ggplot(mean.trt, aes(x=Treatment, y=mean)) +
     facet_grid(cols = vars(group))
 
 ```
-
-```{r}
+Plot abundance
+```{r abund plot}
 
 partial_dat %>% 
   pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>% 
@@ -167,6 +166,32 @@ partial_dat %>%
         axis.text.x = element_text(size = 10),
         strip.text.x = element_text(size= 12))
 ```
+
+### Biomass
+
+```{r sizes, warning = F}
+size.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
+                        sheet = 4, 
+                        range = "A1:U221", # change accordingly
+                        col_names = T) %>% 
+  
+  select(Label, GROUP, Length) %>% 
+  separate(Label, into = c("inc", "Bag", "time", "filter", "image"), sep = "_", remove = T) %>%
+  select(-c(inc, time, filter, image)) %>% 
+  mutate(letter = rep(c("h", "d"), 110)) %>% 
+  pivot_wider(names_from = letter, values_from = Length) %>% 
+  unnest(cols = c(h, d)) %>% 
+  mutate(vol = (pi/6)*d^2*h, # prolate spheroid in um^3
+         Ccont = 0.216*vol^0.939, # Menden-Deuer & Lessard 2000, all non-diatom protists
+         Treatment = substring) 
+
+
+biom = left_join(partial_dat, size.dat)
+```
+
+
+
+
 
 # Serious stats {.tabset}
 
