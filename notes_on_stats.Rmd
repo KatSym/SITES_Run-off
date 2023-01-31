@@ -420,16 +420,36 @@ I want to calculate -and plot- the "corrected" ingestion rates several (or as ma
 ```{r}
 ingest <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
                         sheet = 3,  
-                        range = "A1:L2230", # change accordingly
+                        range = "A1:L2233", # change accordingly
                         col_names = T) 
 
 working <- ingest %>% 
   group_by(Treatment, Mes_ID, Sample, Time_point, Grazer) %>% 
   summarise(cell_num = sum(FLB_presence),
-            flb_ingest = mean(Num_FLB, na.rm = T)) %>% # pay attention here! what's happening with the NAs?
-  as.data.frame() %>% 
+            flb_ingest = sum(Num_FLB, na.rm = T)) %>% # pay attention here! what's happening with the NAs?
+  ungroup() %>% 
   separate(Sample, into = c("inc", "Bag", "time", "filter"), sep = "_", remove = T) %>% 
   select(-inc, -time, -filter) %>% 
+  pivot_wider(names_from = c(Time_point, Grazer), 
+              values_from = c(cell_num, flb_ingest)) %>% 
+  mutate(MF_corr = cell_num_Tend_MF - cell_num_Tstart_MF,
+         HF_corr = cell_num_Tend_HF - cell_num_Tstart_HF,
+         HFir = flb_ingest_Tend_HF/(HF_corr*0.5),
+         MFir = flb_ingest_Tend_MF/(MF_corr*0.5)) %>% 
+  select(-contains("cell_num_T"), -contains("Tstart")) 
+
+#maybe need to replace with 0, will see
+working[sapply(working, is.infinite)] <- NA
+
+
+
+# work in progress - I want to remove the cells that have the same number of flb in the start and end
+working <- ingest %>% 
+  separate(Sample, into = c("inc", "Bag", "time", "filter"), sep = "_", remove = T) %>% 
+  select(-inc, -time, -filter) %>% 
+  group_by(Treatment, Mes_ID, Bag, Grazer) %>% 
+  mutate(nomnom = paste0(FLB_presence, "-", Num_FLB))
+
   pivot_wider(names_from = c(Time_point, Grazer), 
               values_from = c(cell_num, flb_ingest)) %>% 
   mutate(MF_corr = cell_num_Tend_MF - cell_num_Tstart_MF,
