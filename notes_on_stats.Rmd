@@ -72,7 +72,7 @@ partial_dat <- master.dat %>%
                 Hir = FLBinHF_total / (HFwFLB * 0.5),
 # calculate abundances
                 Vol = Fields_counted * Vp,
-                aHF = as.integer(as.character(HF_total/Vol)),
+                aHF = HF_total/Vol,
                 aMF = MF/Vol, 
                 aPF = PF/Vol) %>% 
   
@@ -183,12 +183,43 @@ size.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx",
   unnest(cols = c(h, d)) %>% 
   mutate(vol = (pi/6)*d^2*h, # prolate spheroid in um^3
          Ccont = 0.216*vol^0.939, # Menden-Deuer & Lessard 2000, all non-diatom protists
-         Treatment = substring) 
+         Treatment = factor(substring(Bag, 1, 1), levels = c("C","D","I","E")),
+         Mesocosm = as.factor(substring(Bag, 1, 2)),
+         Replicat = substring(Bag, 3, 3)) %>% 
+  group_by(Treatment, GROUP) %>% 
+  summarise(mean.cell.vol = mean(vol),
+            sd.cell.vol = sd(vol))
 
 
-biom = left_join(partial_dat, size.dat)
+biom = partial_dat %>% 
+  filter(Time_point == "Tend") %>% 
+  select(Treatment, Mesocosm, Mes_ID, Replicate, aHF, aMF, aPF) %>% 
+  pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>% 
+  mutate(GROUP = substring(group, 2, 3))  %>% 
+  inner_join(., size.dat, by = c("Treatment", "GROUP")) %>% 
+  mutate(biomass = abundance * (0.216*mean.cell.vol^0.939)) # Menden-Deuer Lessard 2000, pgC/mL
 ```
 
+Plot
+```{r}
+biom %>% 
+  ggplot(., aes(x = Treatment, y = biomass)) +
+  geom_boxplot(alpha = 0.8) +
+  geom_point(aes(x = Treatment, y = biomass, color = Mes_ID),
+             position = "jitter", 
+             alpha = 0.6,
+             # shape = 1, stroke = 0.7
+  ) +
+  ylab("pg C /mL")+
+  facet_grid(cols = vars(group), 
+             labeller = group_names)+
+  scale_color_manual(values = mes.cols)+
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey96"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))
+```
 
 
 
