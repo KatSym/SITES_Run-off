@@ -30,6 +30,11 @@ master.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx",
                         range = "A1:T217", 
                         col_names = T)
 
+# Area of square = 0.1 \* 0.1 (mm)
+# Area of the filter = pi \* (21/2)^2^ (filter diameter is 25 mm)
+# Volume filtered = 10 mL
+# The volume of 1 field of view is (in mL):
+Vp = 10 * (0.1 * 0.1) / (pi * (21/2)^2)
 
 # for some reason all number columns are characters (possibly because of the NAs in most rows). Let's convert that 
 master.dat[,14:20] <- lapply(master.dat[,14:20], as.numeric)
@@ -44,8 +49,8 @@ partial_dat <- master.dat %>%
     Treatment = fct_relevel(Treatment, c("C","D","I","E")),
     Tot_cells = HF_total + PF + MF,
     # calculate ingestion rates - NOW IT'S COUNTS
-    Mir = FLBinMF_total / (MF * 0.5),
-    Hir = FLBinHF_total / (HFwFLB * 0.5),
+    # Mir = FLBinMF_total / (MF * 0.5),
+    # Hir = FLBinHF_total / (HFwFLB * 0.5),
     # calculate abundances
     Vol = Fields_counted * Vp,
     aHF = HF_total/Vol,
@@ -54,7 +59,7 @@ partial_dat <- master.dat %>%
   
   # filter for Incubation 2 and T30 
   
-  filter(Incubation == 2 
+  filter(Incubation != 1 
          # & Time_point == "Tend"
   )
 
@@ -63,21 +68,22 @@ partial_dat <- master.dat %>%
 
 size.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
                       sheet = 4, 
-                      range = "A1:U221", # change accordingly
+                      range = "A1:U559", # CHANGE accordingly
                       col_names = T) %>% 
   
   select(Label, GROUP, Length) %>% 
   separate(Label, into = c("inc", "Bag", "time", "filter", "image"), sep = "_", remove = T) %>%
-  select(-c(inc, time, filter, image)) %>% 
-  mutate(letter = rep(c("h", "d"), 110)) %>% 
+  select(-c(time, filter, image)) %>% 
+  mutate(letter = rep(c("h", "d"), 279)) %>% 
   pivot_wider(names_from = letter, values_from = Length) %>% 
   unnest(cols = c(h, d)) %>% 
   mutate(vol = (pi/6)*d^2*h, # prolate spheroid in um^3
          Ccont = 0.216*vol^0.939, # Menden-Deuer & Lessard 2000, all non-diatom protists
+         Incubation = as.factor(substring(inc, 3, 3)),
          Treatment = factor(substring(Bag, 1, 1), levels = c("C","D","I","E")),
          Mesocosm = as.factor(substring(Bag, 1, 2)),
-         Replicat = substring(Bag, 3, 3)) %>% 
-  group_by(Treatment, GROUP) %>% 
+         Replicate = substring(Bag, 3, 3)) %>% 
+  group_by(Incubation, Treatment, GROUP) %>% 
   summarise(mean.cell.vol = mean(vol),
             sd.cell.vol = sd(vol))
 
@@ -166,10 +172,78 @@ partial_dat %>%
         axis.text.x = element_text(size = 10),
         strip.text.x = element_text(size= 12))
 
+
+
+
+
+partial_dat %>% 
+  filter(Time_point=="Tend") %>% 
+  pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>%
+  group_by(Incubation, Treatment, group) %>% 
+  summarise(mean = mean(abundance), 
+            sd = sd(abundance))%>% 
+  mutate(Inc = as.factor(Incubation)
+          # ,bag = as.factor(paste(Mesocosm, Replicate, sep = ""))
+            ) %>% 
+  
+  ggplot(., aes(x = Inc, y = mean, colour = Treatment)) +
+  geom_line(aes(group = Treatment))+
+  # geom_point(aes(x = Incubation, y = mean, color = Treatment),
+             # alpha = 0.6,
+             # shape = 1, stroke = 0.7
+  # ) +
+  geom_pointrange(aes(ymin=mean - sd,
+                      ymax=mean + sd),
+                  size = .6, stat = "identity", show.legend = F, alpha = 0.7)+
+
+  # geom_errorbar(aes(x = Incubation,
+  #                   ymax = mean + sd,
+  #                   ymin = mean - sd,
+  #                   colour = Treatment), width = 0.05)+
+
+  ylab("Abundance cells/mL")+
+  facet_grid(rows = vars(group), 
+             labeller = group_names,
+             scales = "free_y")+
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey96"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))+
+  scale_color_manual(values = trt.cols)
+
+
+
+partial_dat %>% 
+  filter(Time_point=="Tend") %>%
+  pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>% 
+  ggplot(., aes(x = Treatment, y = abundance)) +
+  geom_boxplot(alpha = 0.8) +
+  geom_point(aes(x = Treatment, y = abundance, color = Mes_ID),
+             position = "jitter", 
+             alpha = 0.6,
+             # shape = 1, stroke = 0.7
+  ) +
+  ylab("Abundance cells/mL")+
+  facet_grid(group~Incubation, 
+             # labeller = group_names
+             scales = "free_y")+
+  scale_color_manual(values = mes.cols)+
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey96"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))
+
+
+
+
+# mixotroph abundance is from the master dataframe, not corrected
+
 # biomass
 biom %>% 
   mutate(logB = log10(biomass)) %>% 
-  ggplot(., aes(x = Treatment, y = logB)) +
+  ggplot(., aes(x = Treatment, y = c)) +
   geom_boxplot(alpha = 0.8) +
   geom_point(aes(x = Treatment, y = logB, color = Mes_ID),
              position = "jitter", 
@@ -185,6 +259,42 @@ biom %>%
         panel.background = element_rect(fill = "grey96"),
         axis.text.x = element_text(size = 10),
         strip.text.x = element_text(size= 12))
+
+biom %>% 
+  mutate(logB = log10(biomass),
+         Inc = as.factor(Incubation)) %>% 
+  group_by(Inc, Treatment, group) %>% 
+  summarise(mean = mean(logB), 
+            sd = sd(logB))%>% 
+  ggplot(., aes(x = Inc, y = mean, colour = Treatment)) +
+  geom_line(aes(group = Treatment))+
+  # geom_point(aes(x = Incubation, y = mean, color = Treatment),
+  # alpha = 0.6,
+  # shape = 1, stroke = 0.7
+  # ) +
+  geom_pointrange(aes(ymin=mean - sd,
+                      ymax=mean + sd),
+                  size = .6, stat = "identity", show.legend = F, alpha = 0.7)+
+  
+  # geom_errorbar(aes(x = Incubation,
+  #                   ymax = mean + sd,
+  #                   ymin = mean - sd,
+  #                   colour = Treatment), width = 0.05)+
+  
+  ylab("Log pg C /mL")+
+  facet_grid(rows = vars(group), 
+             labeller = group_names,
+             scales = "free_y")+
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey96"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))+
+  scale_color_manual(values = trt.cols)
+
+
+
+
 
 # bacterial abundance
 bact.dat %>% 
