@@ -26,7 +26,7 @@ group_ir <- as_labeller(c(`HFir` = "Heterotrophs",
 
 ## ABUNDANCE
 master.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
-                        sheet = 1, 
+                        sheet = "0.8_samples", 
                         range = "A1:T217", 
                         col_names = T)
 
@@ -67,7 +67,7 @@ partial_dat <- master.dat %>%
 ## SIZE
 
 size.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
-                      sheet = 4, 
+                      sheet = "Sizes", 
                       range = "A1:U559", # CHANGE accordingly
                       col_names = T) %>% 
   
@@ -96,20 +96,48 @@ biom = partial_dat %>%
   inner_join(., size.dat, by = c("Treatment", "GROUP")) %>% 
   mutate(biomass = abundance * (0.216*mean.cell.vol^0.939)) # Menden-Deuer Lessard 2000, pgC/mL
 
+
+## BACTERIA
+
+bact.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
+                      sheet = "0.2_samples",  
+                      range = "A1:N37", # change accordingly
+                      col_names = T) %>% 
+  
+  
+  mutate(factor = (5 * Area)/(pi * (21/2)^2),
+         HB_abund = HB/(Fields_counted*factor),
+         FLB_abund = FLB/(Fields_counted*factor),
+         CY_abund = CY/(Fields_counted*factor),
+         FLB_perc = FLB_abund/HB_abund,
+         
+         Treatment = fct_relevel(Treatment, c("C","D","I","E")))
+
+bact.dat$Mesocosm <- as.factor(bact.dat$Mesocosm)
+bact.dat$Mes_ID <- as.factor(bact.dat$Mes_ID)
+
+
 ## INGESTION
 
 ingest <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
-                    sheet = 3,  
+                    sheet = "Ingestion",  
                     range = "A1:L2233", # change accordingly
                     col_names = T) 
 
 working <- ingest %>% 
-  group_by(Treatment, Mes_ID, Sample, Replicate, Time_point, Grazer) %>% 
+  separate(Sample, into = c("inc", "Bag", "time", "filter"), sep = "_", remove = T) %>% 
+  select(-time, -filter) %>% 
+  group_by(inc, Treatment, Bag, Time_point, Grazer) %>% 
+  # distinct(FLB_presence, Num_FLB, .keep_all = TRUE) 
+  # mutate(nomnom = paste0(FLB_presence, "", Num_FLB))
+  
+  
+  
+  
+  
   summarise(cell_num = sum(FLB_presence),
             flb_ingest = sum(Num_FLB, na.rm = T)) %>% # pay attention here! what's happening with the NAs?
   ungroup() %>% 
-  separate(Sample, into = c("inc", "Bag", "time", "filter"), sep = "_", remove = T) %>% 
-  select(-inc, -time, -filter) %>% 
   pivot_wider(names_from = c(Time_point, Grazer), 
               values_from = c(cell_num, flb_ingest)) %>% 
   # correct ingestion rates
@@ -129,25 +157,6 @@ grazing =  left_join(working, bact.dat, by = c("Treatment", "Mes_ID", "Replicate
   select(-c(9:20), -FLB_abund, -CY_abund) %>% 
   mutate(mCR = MFir/HB_abund, # in mL
          hCR = HFir/HB_abund)
-
-## BACTERIA
-
-bact.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
-                      sheet = 2,  
-                      range = "A1:N37", # change accordingly
-                      col_names = T) %>% 
-  
-  
-  mutate(factor = (5 * Area)/(pi * (21/2)^2),
-         HB_abund = HB/(Fields_counted*factor),
-         FLB_abund = FLB/(Fields_counted*factor),
-         CY_abund = CY/(Fields_counted*factor),
-         FLB_perc = FLB_abund/HB_abund,
-         
-         Treatment = fct_relevel(Treatment, c("C","D","I","E")))
-
-bact.dat$Mesocosm <- as.factor(bact.dat$Mesocosm)
-bact.dat$Mes_ID <- as.factor(bact.dat$Mes_ID)
 
 
 ## BASIC PLOTS =======
@@ -347,3 +356,33 @@ working %>%
         strip.text.x = element_text(size= 12))
 
 ## STATISTICS ========
+
+library(glmmTMB)
+library(ggeffects)
+library(performance)
+library(DHARMa)
+
+# https://r.qcbs.ca/workshop07/book-en/choose-an-error-distribution.html
+
+stat = partial_dat %>% 
+  filter(Time_point=="Tend") %>% 
+  left_join(working, bact.dat, by = c("Incubation", "Treatment", "Mes_ID", "Replicate"), copy = T)
+  
+
+hm = glmmTMB(aHF ~ 1
+             + Treatment 
+             + Incubation
+             + (1|Mesocosm),
+             # offset = Vol,
+             family = poisson(),
+             data = partial_dat %>% 
+               filter(Time_point=="Tend"));summary(hm)
+
+overdisp_fun(hm)
+
+check_model(hm) # why error????
+
+h.pred <- ggpredict(hm, terms = c("Treatment"))
+
+plot(h.pred)
+# simulateResiduals(fittedModel = hm, plot = T)
