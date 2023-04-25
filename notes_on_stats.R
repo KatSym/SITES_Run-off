@@ -25,9 +25,9 @@ group_ir <- as_labeller(c(`HFir` = "Heterotrophs",
 ## and some data wrangling
 
 ## ABUNDANCE
-master.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
+master.dat <- read_xlsx("SITES_microscope_data_working.xlsx", 
                         sheet = "0.8_samples", 
-                        range = "A1:T217", 
+                        range = "A1:P217", 
                         col_names = T)
 
 # Area of square = 0.1 \* 0.1 (mm)
@@ -43,7 +43,7 @@ master.dat$Mes_ID <- as.factor(master.dat$Mes_ID)
 
 # some basic cleaning - wrangling
 partial_dat <- master.dat %>% 
-  select(-c(Date,Date_analysed,Box,Comments,`Photos/ImageJ`)) %>% 
+  select(-Date) %>% 
   mutate(
     #maybe I need to do more factor stuff with other columns
     Treatment = fct_relevel(Treatment, c("C","D","I","E")),
@@ -55,26 +55,28 @@ partial_dat <- master.dat %>%
     Vol = Fields_counted * Vp,
     aHF = HF_total/Vol,
     aMF = MF/Vol, 
-    aPF = PF/Vol) %>% 
+    aPF = PF/Vol) 
   
-  # filter for Incubation 2 and T30 
-  
-  filter(Incubation != 1 
-         # & Time_point == "Tend"
-  )
+  # # filter for Incubation 2 and T30 
+  # 
+  # filter(Incubation != 1 
+  #        # & Time_point == "Tend"
+  # )
 
 
 ## SIZE
-
-size.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
+        # THIS IS MESSY
+# Load the size data. If the number of cells (rows) are more than 30 withing the Incubation - Treatment
+# - GROUP grouping, select only 30. This is done in a new df. Then take the <30 rows groupd anf merge them with 
+# the new df.
+size.dat <- read_xlsx("SITES_microscope_data_working.xlsx", 
                       sheet = "Sizes", 
-                      range = "A1:U559", # CHANGE accordingly
+                      range = "A1:C2043",
                       col_names = T) %>% 
   
-  select(Label, GROUP, Length) %>% 
   separate(Label, into = c("inc", "Bag", "time", "filter", "image"), sep = "_", remove = T) %>%
   select(-c(time, filter, image)) %>% 
-  mutate(letter = rep(c("h", "d"), 279)) %>% 
+  mutate(letter = rep(c("h", "d"), 1021)) %>% 
   pivot_wider(names_from = letter, values_from = Length) %>% 
   unnest(cols = c(h, d)) %>% 
   mutate(vol = (pi/6)*d^2*h, # prolate spheroid in um^3
@@ -83,10 +85,19 @@ size.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx",
          Treatment = factor(substring(Bag, 1, 1), levels = c("C","D","I","E")),
          Mesocosm = as.factor(substring(Bag, 1, 2)),
          Replicate = substring(Bag, 3, 3)) %>% 
-  group_by(Incubation, Treatment, GROUP) %>% 
+  group_by(Incubation, Treatment, GROUP)
+
+set.seed(2023)
+sz.many <- size.dat %>% 
+  filter(n()>30) %>% 
+  slice_sample(n=30) 
+
+sz.data <- size.dat %>% 
+  filter(n()<=30) %>% 
+  full_join(., sz.many) %>% 
   summarise(mean.cell.vol = mean(vol),
             sd.cell.vol = sd(vol))
-
+# end of messiness
 
 biom = partial_dat %>% 
   filter(Time_point == "Tend") %>% 
@@ -99,9 +110,9 @@ biom = partial_dat %>%
 
 ## BACTERIA
 
-bact.dat <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
+bact.dat <- read_xlsx("SITES_microscope_data_working.xlsx", 
                       sheet = "0.2_samples",  
-                      range = "A1:N37", # change accordingly
+                      range = "A1:M109", # change accordingly
                       col_names = T) %>% 
   
   
@@ -119,9 +130,9 @@ bact.dat$Mes_ID <- as.factor(bact.dat$Mes_ID)
 
 ## INGESTION
 
-ingest <- read_xlsx("SITES_microscope_data_sheet.xlsx", 
+ingest <- read_xlsx("SITES_microscope_data_working.xlsx", 
                     sheet = "Ingestion",  
-                    range = "A1:L2233", # change accordingly
+                    range = "A1:L5322", # change accordingly
                     col_names = T) 
 
 working <- ingest %>% 
