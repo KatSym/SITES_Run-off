@@ -27,7 +27,7 @@ group_ir <- as_labeller(c(`HFir` = "Heterotrophs",
 ## ABUNDANCE
 master.dat <- read_xlsx("SITES_microscope_data_working.xlsx", 
                         sheet = "0.8_samples", 
-                        range = "A1:P217", 
+                        range = "A1:Q217", 
                         col_names = T)
 
 # Area of square = 0.1 \* 0.1 (mm)
@@ -37,7 +37,7 @@ master.dat <- read_xlsx("SITES_microscope_data_working.xlsx",
 Vp = 10 * (0.1 * 0.1) / (pi * (21/2)^2)
 
 # for some reason all number columns are characters (possibly because of the NAs in most rows). Let's convert that 
-master.dat[,14:20] <- lapply(master.dat[,14:20], as.numeric)
+master.dat[,10:17] <- lapply(master.dat[,10:17], as.numeric)
 master.dat$Mesocosm <- as.factor(master.dat$Mesocosm)
 master.dat$Mes_ID <- as.factor(master.dat$Mes_ID)
 
@@ -45,9 +45,7 @@ master.dat$Mes_ID <- as.factor(master.dat$Mes_ID)
 partial_dat <- master.dat %>% 
   select(-Date) %>% 
   mutate(
-    #maybe I need to do more factor stuff with other columns
     Treatment = fct_relevel(Treatment, c("C","D","I","E")),
-    Tot_cells = HF_total + PF + MF,
     # calculate ingestion rates - NOW IT'S COUNTS
     # Mir = FLBinMF_total / (MF * 0.5),
     # Hir = FLBinHF_total / (HFwFLB * 0.5),
@@ -55,19 +53,23 @@ partial_dat <- master.dat %>%
     Vol = Fields_counted * Vp,
     aHF = HF_total/Vol,
     aMF = MF/Vol, 
-    aPF = PF/Vol) 
-  
-  # # filter for Incubation 2 and T30 
-  # 
-  # filter(Incubation != 1 
-  #        # & Time_point == "Tend"
-  # )
+    aPF = PF/Vol
+    ) 
 
+rep.na <- master.dat %>% filter(Incubation == 2 & Time_point=="Tend")
+celltofield = rep.na$Cells_counted/rep.na$Fields_counted
+
+
+partial_dat[is.na(partial_dat$Cells_counted)] <- celltofield
+
+partial_dat <- partial_dat %>% 
+  replace(is.na(Cells_counted), partial_dat$Fields_counted*celltofield)
+  mutate(Cells_counted = replace_na(Fields_counted*celltofield))
 
 ## SIZE
         # THIS IS MESSY
 # Load the size data. If the number of cells (rows) are more than 30 withing the Incubation - Treatment
-# - GROUP grouping, select only 30. This is done in a new df. Then take the <30 rows groupd anf merge them with 
+# - GROUP grouping, select only 30. This is done in a new df. Then take the <30 rows group and merge them with 
 # the new df.
 size.dat <- read_xlsx("SITES_microscope_data_working.xlsx", 
                       sheet = "Sizes", 
@@ -104,7 +106,7 @@ biom = partial_dat %>%
   select(Treatment, Mesocosm, Mes_ID, Replicate, aHF, aMF, aPF) %>% 
   pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>% 
   mutate(GROUP = substring(group, 2, 3))  %>% 
-  inner_join(., size.dat, by = c("Treatment", "GROUP")) %>% 
+  inner_join(., sz.data, by = c("Treatment", "GROUP")) %>% 
   mutate(biomass = abundance * (0.216*mean.cell.vol^0.939)) # Menden-Deuer Lessard 2000, pgC/mL
 
 
@@ -254,9 +256,6 @@ partial_dat %>%
         panel.background = element_rect(fill = "grey96"),
         axis.text.x = element_text(size = 10),
         strip.text.x = element_text(size= 12))
-
-
-
 
 # mixotroph abundance is from the master dataframe, not corrected
 
