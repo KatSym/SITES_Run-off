@@ -23,7 +23,8 @@ coef(dir1)
 # BAYESIAN
 
 
-https://numerilab.io/en/analysis_projects/DirichletElections 
+# https://numerilab.io/en/analysis_projects/DirichletElections 
+
 
 library(tidyverse)
 library(rgdal)
