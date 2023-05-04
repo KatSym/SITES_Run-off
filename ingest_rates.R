@@ -34,12 +34,12 @@ ING$Mes_ID <- as.factor(ING$Mes_ID)
 # subtract number of cells with FLB and number of FLB
 IR1 <- ING %>% 
   mutate(
-    cells_MF_corr = cells_feeding_Tend_MF - cells_feeding_Tstart_MF,
-    cells_HF_corr = cells_feeding_Tend_HF - cells_feeding_Tstart_HF,
+    feeding_MF_corr = cells_feeding_Tend_MF - cells_feeding_Tstart_MF,
+    feeding_HF_corr = cells_feeding_Tend_HF - cells_feeding_Tstart_HF,
     flb_MF_corr = flb_ingest_Tend_MF - flb_ingest_Tstart_MF,
     flb_HF_corr = flb_ingest_Tend_HF - flb_ingest_Tstart_HF,
-    MFir = flb_MF_corr/(cells_MF_corr*0.5),
-    HFir = flb_HF_corr/(cells_HF_corr*0.5),
+    MFir = flb_MF_corr/(feeding_MF_corr*0.5),
+    HFir = flb_HF_corr/(feeding_HF_corr*0.5),
     Treatment = fct_relevel(Treatment, c("C","D","I","E"))) %>% 
   select(-contains(c("cells", "Tstart", "flb"))) 
 
