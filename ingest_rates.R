@@ -49,20 +49,20 @@ IR1[sapply(IR1, is.na)] <- 0
 
 
 # subtract number of FLB only
-IR2 <- ING %>% 
-mutate(
-  flb_MF_corr = flb_ingest_Tend_MF - flb_ingest_Tstart_MF,
-  flb_HF_corr = flb_ingest_Tend_HF - flb_ingest_Tstart_HF,
-  MFir = flb_MF_corr/(cells_feeding_Tend_MF*0.5),
-  HFir = flb_HF_corr/(cells_feeding_Tend_HF*0.5),
-  Treatment = fct_relevel(Treatment, c("C","D","I","E"))) %>% 
-  select(-contains(c("cells", "Tstart", "flb"))) 
-IR2[sapply(IR2, is.infinite)] <- 0
-IR2[sapply(IR2, is.na)] <- 0
+# IR2 <- ING %>% 
+# mutate(
+#   flb_MF_corr = flb_ingest_Tend_MF - flb_ingest_Tstart_MF,
+#   flb_HF_corr = flb_ingest_Tend_HF - flb_ingest_Tstart_HF,
+#   MFir = flb_MF_corr/(cells_feeding_Tend_MF*0.5),
+#   HFir = flb_HF_corr/(cells_feeding_Tend_HF*0.5),
+#   Treatment = fct_relevel(Treatment, c("C","D","I","E"))) %>% 
+#   select(-contains(c("cells", "Tstart", "flb"))) 
+# IR2[sapply(IR2, is.infinite)] <- 0
+# IR2[sapply(IR2, is.na)] <- 0
 
 
 
-IR2 %>% 
+IR1 %>% 
   pivot_longer(cols = c(MFir, HFir), names_to = "group", values_to = "IR") %>% 
   ggplot(., aes(x = Incubation, y = IR, colour = Treatment)) +
   facet_grid(rows = vars(group), 
@@ -92,21 +92,46 @@ library(ggeffects)
 library(performance)
 library(DHARMa)
 
+ggplot(IR1, aes(x= HFir))+
+  geom_histogram()
 # should I include interaction or not?
 m.ir1 = glmmTMB(MFir ~ 1
-             + Treatment + Incubation + (1|Mesocosm),
+             + Treatment 
+             + Incubation
+             + (1|Mes_ID)
+             ,
              # offset = Vol,
              family = gaussian(),
              data = IR1)
 summary(m.ir1)
-             
-ggplot(IR2, aes(x= MFir))+
-  geom_histogram()
 
-testOverdispersion(m.ir1)
-testZeroInflation(m.ir1) # I don't know what that means
+# DHARMa workfow
+simulationOutput <- simulateResiduals(m.ir1, plot = F)
+plot(simulationOutput)
+# NOT UNIFORM RESUDUALS WITH INCUBATION
+plotResiduals(simulationOutput, form = IR1$Incubation)
+plotResiduals(simulationOutput, form = IR1$Treatment)
 
-check_model(m.ir1) # why error????
+testOverdispersion(simulationOutput)
+testZeroInflation(simulationOutput) # I don't know what that means
 
-ggpredict(m.ir1, c( "Incubation", "Treatment")) %>% plot()
-             
+check_model(m.ir1) 
+plt <- ggpredict(m.ir1, c( "Incubation", "Treatment"))
+plot(plt, add.data = T)             
+
+
+IR1$HFir[IR1$HFir == 8] <- NA
+
+h.ir1 = glmmTMB(HFir ~ 1
+                + Treatment 
+                + Incubation
+                + (1|Mes_ID)
+                ,
+                # offset = Vol,
+                family = gaussian(),
+                data = IR1)
+summary(h.ir1)
+check_model(m.ir1) 
+
+plt <- ggpredict(h.ir1, c( "Incubation", "Treatment"))
+plot(plt, add.data = T)  
