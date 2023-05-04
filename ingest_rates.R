@@ -100,6 +100,7 @@ m.ir1 = glmmTMB(MFir ~ 1
              + Incubation
              + (1|Mes_ID)
              ,
+             ziformula = ~1,
              # offset = Vol,
              family = gaussian(),
              data = IR1)
@@ -120,18 +121,27 @@ plt <- ggpredict(m.ir1, c( "Incubation", "Treatment"))
 plot(plt, add.data = T)             
 
 
-IR1$HFir[IR1$HFir == 8] <- NA
+
+ir1 <- IR1 %>% filter(HFir != 8)
 
 h.ir1 = glmmTMB(HFir ~ 1
                 + Treatment 
                 + Incubation
                 + (1|Mes_ID)
                 ,
+                # ziformula = ~1,
                 # offset = Vol,
                 family = gaussian(),
-                data = IR1)
+                data = ir1)
 summary(h.ir1)
-check_model(m.ir1) 
+check_model(h.ir1) 
+
+simulationOutput <- simulateResiduals(h.ir1, plot = F)
+plot(simulationOutput, quantreg = T)
+# NOT UNIFORM RESUDUALS WITH INCUBATION
+plotResiduals(simulationOutput, form = IR1$Incubation)
+plotResiduals(simulationOutput, form = IR1$Treatment)
+testOutliers(simulationOutput)
 
 plt <- ggpredict(h.ir1, c( "Incubation", "Treatment"))
 plot(plt, add.data = T)  
