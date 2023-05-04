@@ -30,41 +30,37 @@ master.dat <- read_xlsx("SITES_microscope_data_working.xlsx",
                         range = "A1:Q217", 
                         col_names = T)
 
+# for some reason all number columns are characters (possibly because of the NAs in most rows). Let's convert that 
+master.dat[,10:17] <- lapply(master.dat[,10:17], as.numeric)
+master.dat$Mesocosm <- as.factor(master.dat$Mesocosm)
+master.dat$Mes_ID <- as.factor(master.dat$Mes_ID)
+# master.dat$Incubation <- as.factor(master.dat$Incubation)
+
 # Area of square = 0.1 \* 0.1 (mm)
 # Area of the filter = pi \* (21/2)^2^ (filter diameter is 25 mm)
 # Volume filtered = 10 mL
 # The volume of 1 field of view is (in mL):
 Vp = 10 * (0.1 * 0.1) / (pi * (21/2)^2)
 
-# for some reason all number columns are characters (possibly because of the NAs in most rows). Let's convert that 
-master.dat[,10:17] <- lapply(master.dat[,10:17], as.numeric)
-master.dat$Mesocosm <- as.factor(master.dat$Mesocosm)
-master.dat$Mes_ID <- as.factor(master.dat$Mes_ID)
-
 # some basic cleaning - wrangling
 partial_dat <- master.dat %>% 
   select(-Date) %>% 
   mutate(
     Treatment = fct_relevel(Treatment, c("C","D","I","E")),
-    # calculate ingestion rates - NOW IT'S COUNTS
-    # Mir = FLBinMF_total / (MF * 0.5),
-    # Hir = FLBinHF_total / (HFwFLB * 0.5),
     # calculate abundances
     Vol = Fields_counted * Vp,
-    aHF = HF_total/Vol,
+    aHF = HF/Vol,
     aMF = MF/Vol, 
     aPF = PF/Vol
     ) 
-
+# replace NA values in the Cells_counted column for Inc 2 and Tstart with calculated values
 rep.na <- master.dat %>% filter(Incubation == 2 & Time_point=="Tend")
 celltofield = rep.na$Cells_counted/rep.na$Fields_counted
 
+partial_dat <- within(partial_dat, Cells_counted <- ifelse(is.na(Cells_counted),
+                                                           celltofield * Fields_counted,
+                                                           Cells_counted))
 
-partial_dat[is.na(partial_dat$Cells_counted)] <- celltofield
-
-partial_dat <- partial_dat %>% 
-  replace(is.na(Cells_counted), partial_dat$Fields_counted*celltofield)
-  mutate(Cells_counted = replace_na(Fields_counted*celltofield))
 
 ## SIZE
         # THIS IS MESSY
@@ -117,14 +113,13 @@ bact.dat <- read_xlsx("SITES_microscope_data_working.xlsx",
                       range = "A1:M109", # change accordingly
                       col_names = T) %>% 
   
-  
-  mutate(factor = (5 * Area)/(pi * (21/2)^2),
+    mutate(factor = (5 * Area)/(pi * (21/2)^2),
          HB_abund = HB/(Fields_counted*factor),
          FLB_abund = FLB/(Fields_counted*factor),
          CY_abund = CY/(Fields_counted*factor),
          FLB_perc = FLB_abund/HB_abund,
-         
-         Treatment = fct_relevel(Treatment, c("C","D","I","E")))
+         Treatment = fct_relevel(Treatment, c("C","D","I","E"))) %>% 
+  select(-c(CY, FLB, HB, Fields_counted, factor, Area))
 
 bact.dat$Mesocosm <- as.factor(bact.dat$Mesocosm)
 bact.dat$Mes_ID <- as.factor(bact.dat$Mes_ID)
@@ -134,30 +129,42 @@ bact.dat$Mes_ID <- as.factor(bact.dat$Mes_ID)
 
 ingest <- read_xlsx("SITES_microscope_data_working.xlsx", 
                     sheet = "Ingestion",  
-                    range = "A1:L5322", # change accordingly
+                    range = "A1:K5361", # change accordingly
                     col_names = T) 
 
 working <- ingest %>% 
   separate(Sample, into = c("inc", "Bag", "time", "filter"), sep = "_", remove = T) %>% 
   select(-time, -filter) %>% 
-  group_by(inc, Treatment, Bag, Time_point, Grazer) %>% 
+  mutate( Incubation = as.factor(substring(inc, 3, 3)),
+          Treatment = factor(substring(Bag, 1, 1), levels = c("C","D","I","E")),
+          Mesocosm = as.factor(substring(Bag, 1, 2)),
+          Replicate = substring(Bag, 3, 3)) %>% 
+  group_by(Incubation, Treatment, Mesocosm, Replicate, Time_point, Grazer) %>% 
   # distinct(FLB_presence, Num_FLB, .keep_all = TRUE) 
   # mutate(nomnom = paste0(FLB_presence, "", Num_FLB))
   
-  
-  
-  
-  
-  summarise(cell_num = sum(FLB_presence),
+  summarise(cells_feeding = sum(FLB_presence),
             flb_ingest = sum(Num_FLB, na.rm = T)) %>% # pay attention here! what's happening with the NAs?
   ungroup() %>% 
+  inner_join(., partial_dat %>%
+                select(Incubation, Treatment, Mesocosm, Mes_ID, Replicate, Time_point, Cells_counted),
+             by = c("Incubation", "Treatment", "Mesocosm", "Replicate", "Time_point")) %>%
+  # mutate(flbc = 100*flb_ingest/Cells_counted) %>% 
+  # for now
+  select(-Cells_counted) %>% 
+  #
   pivot_wider(names_from = c(Time_point, Grazer), 
-              values_from = c(cell_num, flb_ingest)) %>% 
+              values_from = c(cells_feeding, flb_ingest
+                              # , flbc
+                              )) %>% 
   # correct ingestion rates
-  mutate(MF_corr = cell_num_Tend_MF - cell_num_Tstart_MF,
-         HF_corr = cell_num_Tend_HF - cell_num_Tstart_HF,
-         HFir = flb_ingest_Tend_HF/(HF_corr*0.5),
-         MFir = flb_ingest_Tend_MF/(MF_corr*0.5),
+  mutate(
+         # MF_corr1 = cell_num_Tend_MF - cell_num_Tstart_MF,
+         # HF_corr1 = cell_num_Tend_HF - cell_num_Tstart_HF,
+         MF_corr2 = flb_ingest_Tend_MF - flb_ingest_Tstart_MF,
+         HF_corr2 = flb_ingest_Tend_HF - flb_ingest_Tstart_HF,
+         MFir = MF_corr2/(cells_feeding_Tend_MF*0.5),
+         HFir = HF_corr2/(cells_feeding_Tend_HF*0.5),
          Treatment = fct_relevel(Treatment, c("C","D","I","E"))) %>% 
   select(-contains(c("cell_num_T", "Tstart", "flb_ingest"))) 
 
@@ -165,39 +172,24 @@ working$Mes_ID <- as.factor(working$Mes_ID)
 
 #if I replace with NA it gives NA in the summary
 working[sapply(working, is.infinite)] <- 0
+# what to do with negative values???
 
 grazing =  left_join(working, bact.dat, by = c("Treatment", "Mes_ID", "Replicate"), copy = T) %>% 
   select(-c(9:20), -FLB_abund, -CY_abund) %>% 
   mutate(mCR = MFir/HB_abund, # in mL
          hCR = HFir/HB_abund)
 
+# for plotting
+sumIR <- working %>% 
+  pivot_longer(cols = c(MFir, HFir), names_to = "group", values_to = "IR") %>% 
+  group_by(Incubation, Treatment, group) %>% 
+  summarise(IR.mean = mean(IR, na.rm =T), 
+            IR.sd = sd(IR, na.rm =T))
+
 
 ## BASIC PLOTS =======
 
 #abundance
-partial_dat %>% 
-  pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>% 
-  ggplot(., aes(x = Treatment, y = abundance)) +
-  geom_boxplot(alpha = 0.8) +
-  geom_point(aes(x = Treatment, y = abundance, color = Mes_ID),
-             position = "jitter", 
-             alpha = 0.6,
-             # shape = 1, stroke = 0.7
-  ) +
-  ylab("Abundance cells/mL")+
-  facet_grid(cols = vars(group), 
-             labeller = group_names)+
-  scale_color_manual(values = mes.cols)+
-  theme(panel.grid.minor = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.background = element_rect(fill = "grey96"),
-        axis.text.x = element_text(size = 10),
-        strip.text.x = element_text(size= 12))
-
-
-
-
-
 partial_dat %>% 
   filter(Time_point=="Tend") %>% 
   pivot_longer(cols = c(aHF, aPF, aMF), names_to = "group", values_to = "abundance") %>%
@@ -337,9 +329,10 @@ bact.dat %>%
 # ingestion rate
 working %>% 
   pivot_longer(cols = c(MFir, HFir), names_to = "group", values_to = "IR") %>% 
-  ggplot(., aes(x = Treatment, y = IR)) +
-  facet_grid(cols = vars(group), 
+  ggplot(., aes(x = Incubation, y = IR, colour = Treatment)) +
+  facet_grid(rows = vars(group), 
              labeller = group_ir)+
+  # geom_line(aes(group = Treatment))+
   # geom_boxplot(alpha = 0.8) +
   geom_point(aes(color = Mes_ID),
              position = "jitter", 
@@ -349,13 +342,13 @@ working %>%
   scale_color_manual(values = mes.cols)+
   geom_point(aes(color = Treatment), stat = "summary", fun = "mean",size = 4)+
   geom_pointrange(data =sumIR,
-                  aes(x = sumIR$Treatment,
+                  aes(x = sumIR$Incubation,
                       y = sumIR$IR.mean,
                       ymin=sumIR$IR.mean-sumIR$IR.sd,
                       ymax=sumIR$IR.mean+sumIR$IR.sd,
                       fill = sumIR$Treatment),
                   size = .6, stat = "identity", show.legend = F)+
-  # geom_pointrange(stat = "summary", fun.y = mean, 
+  # geom_pointrange(stat = "summary", fun.y = mean,
   #                 fun.ymin = mean-sd, fun.yman = mean+sd)
   scale_fill_manual(values = trt.cols)+
   ylab(expression("Ingestion rate"~"bacteria" ~ "cells"^{-1} ~"h"^{-1}))+
@@ -375,24 +368,120 @@ library(DHARMa)
 # https://r.qcbs.ca/workshop07/book-en/choose-an-error-distribution.html
 
 stat = partial_dat %>% 
-  filter(Time_point=="Tend") %>% 
-  left_join(working, bact.dat, by = c("Incubation", "Treatment", "Mes_ID", "Replicate"), copy = T)
-  
+  filter(Time_point=="Tend")
+  # left_join(IR1, bact.dat, by = c("Incubation", "Treatment", "Mes_ID", "Replicate"), copy = T)
+
+ggplot(partial_dat, aes(x= HF))+
+  geom_histogram()
+ggplot(partial_dat, aes(x= aMF))+
+  geom_histogram()
+ggplot(partial_dat, aes(x= aPF))+
+  geom_histogram()
+
 
 hm = glmmTMB(aHF ~ 1
              + Treatment 
              + Incubation
              + (1|Mesocosm),
              # offset = Vol,
-             family = poisson(),
+             family = nbinom2(),
              data = partial_dat %>% 
-               filter(Time_point=="Tend"));summary(hm)
-
-overdisp_fun(hm)
+               filter(Time_point=="Tend"))
+summary(hm)
 
 check_model(hm) # why error????
 
-h.pred <- ggpredict(hm, terms = c("Treatment"))
+simulationOutput <- simulateResiduals(hm, plot = F)
+plot(simulationOutput, quantreg = T)
+# NOT UNIFORM RESUDUALS WITH INCUBATION
+plotResiduals(simulationOutput, form = stat$Incubation)
+plotResiduals(simulationOutput, form = stat$Treatment)
+testOutliers(simulationOutput)
+testOverdispersion(simulationOutput)
 
-plot(h.pred)
-# simulateResiduals(fittedModel = hm, plot = T)
+plt <- ggpredict(hm, c( "Incubation", "Treatment"))
+plot(plt, add.data = T)  
+# ---
+
+pm = glmmTMB(aPF ~ 1
+             + Treatment 
+             + Incubation
+             + (1|Mesocosm),
+             # offset = Vol,
+             family = gaussian(link = "log"),
+             data = partial_dat %>% 
+               filter(Time_point=="Tend"))
+
+# gaussian and nbimon don't have a huge difference in AIC etc. Both bad at deviation
+summary(pm)
+
+check_model(pm) # why error????
+
+simulationOutput <- simulateResiduals(pm, plot = F)
+plot(simulationOutput, quantreg = T)
+# NOT UNIFORM RESUDUALS WITH INCUBATION
+plotResiduals(simulationOutput, form = stat$Incubation)
+plotResiduals(simulationOutput, form = stat$Treatment)
+testOutliers(simulationOutput)
+testOverdispersion(simulationOutput)
+
+plt <- ggpredict(pm, c( "Incubation", "Treatment"))
+plot(plt, add.data = T)  
+# ---
+
+# mixotrophs from master and not ingestion
+mm = glmmTMB(aMF ~ 1
+             + Treatment 
+             + Incubation
+             + (1|Mesocosm),
+             # offset = Vol,
+             family = gaussian(link = "log"),
+             data = partial_dat %>% 
+               filter(Time_point=="Tend"))
+summary(mm)
+
+check_model(mm) # why error????
+
+simulationOutput <- simulateResiduals(mm, plot = F)
+plot(simulationOutput, quantreg = T)
+# NOT UNIFORM RESUDUALS WITH INCUBATION
+plotResiduals(simulationOutput, form = stat$Incubation)
+plotResiduals(simulationOutput, form = stat$Treatment)
+testOutliers(simulationOutput)
+testOverdispersion(simulationOutput)
+testZeroInflation(simulationOutput)
+
+plt <- ggpredict(mm, c( "Incubation", "Treatment"))
+plot(plt, add.data = T) 
+
+# mixotrophs from ingestion and not master
+dat <- partial_dat %>% 
+  filter(Time_point=="Tend") %>% 
+  left_join(., IR1, by = c("Incubation", "Treatment", "Mesocosm", "Mes_ID", "Replicate")) %>% 
+  mutate(aMFc = feeding_MF_corr/Vol) %>% 
+  select(-c(Time_point, Fields_counted, Cells_counted, Vol, contains("FLB"), contains("feeding")))
+
+dat$aMFc[dat$aMFc<0] <- 0
+
+mm1 = glmmTMB(aMFc ~ 1
+             + Treatment 
+             + Incubation
+             + (1|Mesocosm),
+             # offset = Vol,
+             family = gaussian(),
+             data = dat)
+summary(mm1)
+
+check_model(mm1) # why error????
+
+simulationOutput <- simulateResiduals(mm1, plot = F)
+plot(simulationOutput, quantreg = T)
+# NOT UNIFORM RESUDUALS WITH INCUBATION
+plotResiduals(simulationOutput, form = stat$Incubation)
+plotResiduals(simulationOutput, form = stat$Treatment)
+testOutliers(simulationOutput)
+testOverdispersion(simulationOutput)
+testZeroInflation(simulationOutput)
+
+plt <- ggpredict(mm1, c( "Incubation", "Treatment"))
+plot(plt, add.data = T) 
