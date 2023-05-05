@@ -92,7 +92,7 @@ library(ggeffects)
 library(performance)
 library(DHARMa)
 
-ggplot(IR1, aes(x= HFir))+
+ggplot(IR1, aes(x= MFir))+
   geom_histogram()
 # should I include interaction or not?
 m.ir1 = glmmTMB(MFir ~ 1
@@ -100,9 +100,11 @@ m.ir1 = glmmTMB(MFir ~ 1
              + Incubation
              + (1|Mes_ID)
              ,
-             ziformula = ~1,
-             # offset = Vol,
-             family = gaussian(),
+             ziformula = ~1
+             + Treatment 
+              + Incubation,
+              # + (1|Mes_ID),
+             family = ziGamma(link = "log"),
              data = IR1)
 summary(m.ir1)
 
