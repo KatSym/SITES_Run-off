@@ -384,7 +384,7 @@ hm = glmmTMB(aHF ~ 1
              + Incubation
              + (1|Mesocosm),
              # offset = Vol,
-             family = nbinom2(),
+             family = gaussian(link = "log"),
              data = partial_dat %>% 
                filter(Time_point=="Tend"))
 summary(hm)
@@ -398,12 +398,13 @@ plotResiduals(simulationOutput, form = stat$Incubation)
 plotResiduals(simulationOutput, form = stat$Treatment)
 testOutliers(simulationOutput)
 testOverdispersion(simulationOutput)
+testZeroInflation(simulationOutput)
 
 plt <- ggpredict(hm, c( "Incubation", "Treatment"))
 plot(plt, add.data = T)  
 # ---
 
-pm = glmmTMB(aPF ~ 1
+pm = glmmTMB(log(aPF) ~ 1
              + Treatment 
              + Incubation
              + (1|Mesocosm),
@@ -424,6 +425,7 @@ plotResiduals(simulationOutput, form = stat$Incubation)
 plotResiduals(simulationOutput, form = stat$Treatment)
 testOutliers(simulationOutput)
 testOverdispersion(simulationOutput)
+testZeroInflation(simulationOutput)
 
 plt <- ggpredict(pm, c( "Incubation", "Treatment"))
 plot(plt, add.data = T)  
@@ -467,7 +469,11 @@ mm1 = glmmTMB(aMFc ~ 1
              + Treatment 
              + Incubation
              + (1|Mesocosm),
-             # offset = Vol,
+             ziformula = ~1
+             + Treatment
+             + Incubation
+             + (1|Mes_ID)
+             ,
              family = gaussian(),
              data = dat)
 summary(mm1)
@@ -477,8 +483,8 @@ check_model(mm1) # why error????
 simulationOutput <- simulateResiduals(mm1, plot = F)
 plot(simulationOutput, quantreg = T)
 # NOT UNIFORM RESUDUALS WITH INCUBATION
-plotResiduals(simulationOutput, form = stat$Incubation)
-plotResiduals(simulationOutput, form = stat$Treatment)
+plotResiduals(simulationOutput, form = dat$Incubation)
+plotResiduals(simulationOutput, form = dat$Treatment)
 testOutliers(simulationOutput)
 testOverdispersion(simulationOutput)
 testZeroInflation(simulationOutput)
