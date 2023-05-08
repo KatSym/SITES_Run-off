@@ -10,6 +10,7 @@ pm = brm(bf(aPF ~ Treatment
          iter = 2000,
          cores = 4,
          control = list(adapt_delta=0.95),
+         seed=543,
          backend = "cmdstanr", 
          data = dat)
 pp_check(pm, ndraws = 100)
@@ -26,6 +27,7 @@ hm = brm(bf(aHF ~ Treatment
          iter = 2000,
          cores = 4,
          control = list(adapt_delta=0.95),
+         seed=543,
          backend = "cmdstanr", 
          data = dat)
 pp_check(hm, ndraws = 100)
@@ -59,7 +61,7 @@ bh = brm(bf(HF ~ Treatment
          cores = 4,
          control = list(adapt_delta=0.95),
          backend = "cmdstanr", 
-         data = dataa)
+         data = bdat)
 pp_check(bh, ndraws = 100)
 summary(bh, prob = .9)
 plot(conditional_effects(bh, categorical = F, prob = .9), ask = FALSE)
@@ -75,7 +77,7 @@ bp = brm(bf(PF ~ Treatment
          cores = 4,
          control = list(adapt_delta=0.95),
          backend = "cmdstanr", 
-         data = dataa)
+         data = bdat)
 pp_check(bp, ndraws = 100)
 summary(bp, prob = .9)
 plot(conditional_effects(bp, categorical = F, prob = .9), ask = FALSE)
@@ -90,7 +92,7 @@ bm = brm(bf(MF ~ Treatment
          cores = 4,
          control = list(adapt_delta=0.95),
          backend = "cmdstanr", 
-         data = dataa)
+         data = bdat)
 pp_check(bm, ndraws = 100)
 summary(bm, prob = .9)
 plot(conditional_effects(bm, categorical = F, prob = .9), ask = FALSE)
