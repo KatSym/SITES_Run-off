@@ -8,7 +8,7 @@ library(broom.mixed)
 
 # abundance
 
-apm = brm(bf(aPF ~ Treatment
+ap.m = brm(bf(aPF ~ Treatment
             + Incubation
             + Treatment:Incubation
             + (1|Mesocosm)),
@@ -20,41 +20,47 @@ apm = brm(bf(aPF ~ Treatment
          seed=543,
          backend = "cmdstanr", 
          data = dat,
-         file = "models/apm"
+         file = "models/ap.m"
          )
-pp_check(apm, ndraws = 100)
-summary(apm, prob = .9)
-plot(conditional_effects(apm, categorical = F, prob = .9), ask = FALSE)
-plot(apm, ask = F)
+pp_check(ap.m, ndraws = 100)
+summary(ap.m, prob = .9)
+plot(conditional_effects(ap.m, categorical = F, prob = .9), ask = FALSE)
+plot(ap.m, ask = F)
 
-cef <- conditional_effects(apm, categorical = F, prob = .9)[[3]]
-plot(cef, plot = F)[[3]] +
+ap.cef <- conditional_effects(ap.m, categorical = F, prob = .9)
+plot(ap.cef, plot = F)[[3]] +
   geom_line(size =1.2)+
   scale_color_manual(values = trt.cols, aesthetics = c("colour", "fill")) +
   geom_point(data = dat, aes(x = Incubation, y = aPF, colour = Treatment), 
              inherit.aes = FALSE, position = position_jitter(width=0.12),
-             alpha = 0.5)
+             alpha = 0.5)+
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))+
+  labs(y = "Phototroph abundance cells/mL")
 
-
-
-pm.emt= emtrends(apm, "Treatment", var = "Incubation")
+# slopes for each treatment
+pm.emt= emtrends(ap.m, "Treatment", var = "Incubation")
 summary(pm.emt, point.est = mean, level = .9)
 
-pm.em = emmeans(apm, pairwise  ~ Treatment | Incubation)
-pm.em = emmeans (apm, pairwise  ~ Treatment | Incubation,
+# contrasts at intercept, or at specified points across the continuous predictor
+pm.em = emmeans(ap.m, pairwise  ~ Treatment | Incubation)
+pm.em = emmeans (ap.m, pairwise  ~ Treatment | Incubation,
                   at = list(Incubation = c(1, 2, 3)))
 summary(pm.em, point.est = mean, level = .9)
 
-pm.pairs = pairs(pm.emt)
+# pairwise comparisons
+pm.pairs = pairs(pm.emt, level = .9)
 summary(pm.pairs, point.est = mean, level = .9)
 
-
-post_apm <- posterior_samples(apm) %>% select(-lp__) %>% round(digits = 3)
-
+post_apm <- posterior_samples(ap.m) %>% select(-lp__) %>% round(digits = 3)
 
 
 
-hm = brm(bf(aHF ~ Treatment 
+
+ah.m = brm(bf(aHF ~ Treatment 
             * Incubation
             + (1|Mesocosm)),
          family = lognormal(link = "identity", link_sigma = "log"),
@@ -64,14 +70,30 @@ hm = brm(bf(aHF ~ Treatment
          control = list(adapt_delta=0.95),
          seed=543,
          backend = "cmdstanr", 
-         data = dat)
-pp_check(hm, ndraws = 100)
-summary(hm, prob = .9)
-plot(conditional_effects(hm, categorical = F, prob = .9), ask = FALSE)
-plot(hm)
+         data = dat,
+         file = "models/ah.m")
+pp_check(ah.m, ndraws = 100)
+summary(ah.m, prob = .9)
+plot(conditional_effects(ah.m, categorical = F, prob = .9), ask = FALSE)
+plot(ah.m)
+
+ah.cef <- conditional_effects(ah.m, categorical = F, prob = .9)
+plot(ah.cef, plot = F)[[3]] +
+  geom_line(size =1.2)+
+  scale_color_manual(values = trt.cols, aesthetics = c("colour", "fill")) +
+  geom_point(data = dat, aes(x = Incubation, y = aHF, colour = Treatment), 
+             inherit.aes = FALSE, position = position_jitter(width=0.12),
+             alpha = 0.5)+
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))+
+  labs(y = "Heterotroph abundance cells/mL")
 
 
-mm = brm(bf(aMFc ~ Treatment 
+
+am.m = brm(bf(aMFc ~ Treatment 
             * Incubation
             + (1|Mesocosm)),
          family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
@@ -81,14 +103,15 @@ mm = brm(bf(aMFc ~ Treatment
          control = list(adapt_delta=0.95),
          seed=543,
          backend = "cmdstanr", 
-         data = dat)
-pp_check(mm, ndraws = 100)
-summary(mm, prob = .9)
-plot(conditional_effects(mm, categorical = F, prob = .9), ask = FALSE)
-plot(mm)
+         data = dat,
+         file = "models/am.m")
+pp_check(am.m, ndraws = 100)
+summary(am.m, prob = .9)
+plot(conditional_effects(am.m, categorical = F, prob = .9), ask = FALSE)
+plot(am.m)
 
 # biomass
-bh = brm(bf(HF ~ Treatment 
+bh.m = brm(bf(HF ~ Treatment 
             * Incubation
             + (1|Mes_ID)),
          family = lognormal(link = "identity", link_sigma = "log"),
@@ -98,14 +121,30 @@ bh = brm(bf(HF ~ Treatment
          control = list(adapt_delta=0.95),
          seed=543,
          backend = "cmdstanr", 
-         data = bdat)
-pp_check(bh, ndraws = 100) # not great
-summary(bh, prob = .9)
-plot(conditional_effects(bh, categorical = F, prob = .9), ask = FALSE)
-plot(bh)
+         data = bdat,
+         file = "models/bh.m")
+pp_check(bh.m, ndraws = 100) # not great
+summary(bh.m, prob = .9)
+plot(conditional_effects(bh.m, categorical = F, prob = .9), ask = FALSE)
+plot(bh.m)
+
+# plot
+bh.cef <- conditional_effects(bh.m, categorical = F, prob = .9)
+plot(bh.cef, plot = F)[[3]] +
+  geom_line(size =1.2)+
+  scale_color_manual(values = trt.cols, aesthetics = c("colour", "fill")) +
+  geom_point(data = bdat, aes(x = Incubation, y = HF, colour = Treatment), 
+             inherit.aes = FALSE, position = position_jitter(width=0.12),
+             alpha = 0.5)+
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))+
+  labs(y = "Heterotroph biomass pg C/mL")
 
 
-bp = brm(bf(PF ~ Treatment 
+bp.m = brm(bf(PF ~ Treatment 
             * Incubation
             + (1|Mes_ID)),
          family = lognormal(link = "identity", link_sigma = "log"),
@@ -115,13 +154,31 @@ bp = brm(bf(PF ~ Treatment
          control = list(adapt_delta=0.99),
          seed=543,
          backend = "cmdstanr", 
-         data = bdat)
-pp_check(bp, ndraws = 100)
-summary(bp, prob = .9)
-plot(conditional_effects(bp, categorical = F, prob = .9), ask = FALSE)
-plot(bp)
+         data = bdat, 
+         file = "models/bp.m")
+pp_check(bp.m, ndraws = 100)
+summary(bp.m, prob = .9)
+plot(conditional_effects(bp.m, categorical = F, prob = .9), ask = FALSE)
+plot(bp.m)
 
-bm = brm(bf(MF ~ Treatment 
+# plot
+bp.cef <- conditional_effects(bp.m, categorical = F, prob = .9)
+plot(bp.cef, plot = F)[[3]] +
+  geom_line(size =1.2)+
+  scale_color_manual(values = trt.cols, aesthetics = c("colour", "fill")) +
+  geom_point(data = bdat, aes(x = Incubation, y = PF, colour = Treatment), 
+             inherit.aes = FALSE, position = position_jitter(width=0.12),
+             alpha = 0.5)+
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))+
+  labs(y = "Photortoph biomass pg C/mL")
+
+
+# check missing values
+bm.m = brm(bf(MF ~ Treatment 
             * Incubation
             + (1|Mes_ID)),
          family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
@@ -131,15 +188,31 @@ bm = brm(bf(MF ~ Treatment
          control = list(adapt_delta=0.95),
          seed=543,
          backend = "cmdstanr", 
-         data = bdat)
-pp_check(bm, ndraws = 100)
-summary(bm, prob = .9)
-plot(conditional_effects(bm, categorical = F, prob = .9), ask = FALSE)
-plot(bm)
+         data = bdat,
+         file = "models/bm.m")
+pp_check(bm.m, ndraws = 100)
+summary(bm.m, prob = .9)
+plot(conditional_effects(bm.m, categorical = F, prob = .9), ask = FALSE)
+plot(bm.m)
+
+# plot
+bm.cef <- conditional_effects(bm.m, categorical = F, prob = .9)
+plot(bm.cef, plot = F)[[3]] +
+  geom_line(size =1.2)+
+  scale_color_manual(values = trt.cols, aesthetics = c("colour", "fill")) +
+  geom_point(data = bdat, aes(x = Incubation, y = MF, colour = Treatment), 
+             inherit.aes = FALSE, position = position_jitter(width=0.12),
+             alpha = 0.5)+
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))+
+  labs(y = "Mixotroph biomass pg C/mL")
          
 # ingestion rates 
 
-mir = brm(bf(MFir ~ Treatment 
+mir.m = brm(bf(MFir ~ Treatment 
              * Incubation
              + (1|Mes_ID),
              hu ~ Treatment 
@@ -152,16 +225,34 @@ mir = brm(bf(MFir ~ Treatment
           control = list(adapt_delta=0.95),
           seed = 543,
           backend = "cmdstanr", 
-          data = IR1)
+          data = IR1, 
+          file = "models/mir.m")
 
-pp_check(mir, ndraws = 100)
-summary(mir, prob = .9)
+pp_check(mir.m, ndraws = 100)
+summary(mir.m, prob = .9)
 ## we want Rhat to be 1, Bulk_ESS & Tail_ESS to make sence withthe total post-warmup draws
 ## something is significant when CI have the same sign (+-)
-plot(conditional_effects(mir, categorical = F, prob = .9), ask = FALSE)
-plot(mir)
+plot(conditional_effects(mir.m, categorical = F, prob = .9), ask = FALSE)
+plot(mir.m)
 
-hir = brm(bf(HFir ~ Treatment 
+# plot
+mir.cef <- conditional_effects(mir.m, categorical = F, prob = .9)
+plot(mir.cef, plot = F)[[3]] +
+  geom_line(size =1.2)+
+  scale_color_manual(values = trt.cols, aesthetics = c("colour", "fill")) +
+  geom_point(data = IR1, aes(x = Incubation, y = MFir, colour = Treatment), 
+             inherit.aes = FALSE, position = position_jitter(width=0.12),
+             alpha = 0.5)+
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))+
+  labs(y = "MIxotroph ingestion rate FLB/cell Hr")
+
+
+
+hir.m = brm(bf(HFir ~ Treatment 
              * Incubation
              + (1|Mesocosm),
              hu ~ Treatment 
@@ -174,9 +265,25 @@ hir = brm(bf(HFir ~ Treatment
           control = list(adapt_delta=0.95),
           seed=543,
           backend = "cmdstanr", 
-          data = IR1)
+          data = IR1,
+          file = "models/hir.m")
 
 pp_check(hir, ndraws = 100)
 summary(hir, prob = .9)
 plot(conditional_effects(hir, categorical = F, prob = .9), ask = FALSE)
 plot(hir)
+
+# plot
+hir.cef <- conditional_effects(hir.m, categorical = F, prob = .9)
+plot(hir.cef, plot = F)[[3]] +
+  geom_line(size =1.2)+
+  scale_color_manual(values = trt.cols, aesthetics = c("colour", "fill")) +
+  geom_point(data = IR1, aes(x = Incubation, y = HFir, colour = Treatment), 
+             inherit.aes = FALSE, position = position_jitter(width=0.12),
+             alpha = 0.5)+
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))+
+  labs(y = "Heterotroph ingestion rate FLB/cell Hr")
