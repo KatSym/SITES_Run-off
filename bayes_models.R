@@ -1,6 +1,7 @@
 library(brms)
 library(tidybayes)
 library(emmeans)
+library(scales)
 library(loo)
 library(broom)
 library(broom.mixed) 
@@ -24,7 +25,17 @@ apm = brm(bf(aPF ~ Treatment
 pp_check(apm, ndraws = 100)
 summary(apm, prob = .9)
 plot(conditional_effects(apm, categorical = F, prob = .9), ask = FALSE)
-plot(apm)
+plot(apm, ask = F)
+
+cef <- conditional_effects(apm, categorical = F, prob = .9)[[3]]
+plot(cef, plot = F)[[3]] +
+  geom_line(size =1.2)+
+  scale_color_manual(values = trt.cols, aesthetics = c("colour", "fill")) +
+  geom_point(data = dat, aes(x = Incubation, y = aPF, colour = Treatment), 
+             inherit.aes = FALSE, position = position_jitter(width=0.12),
+             alpha = 0.5)
+
+
 
 pm.emt= emtrends(apm, "Treatment", var = "Incubation")
 summary(pm.emt, point.est = mean, level = .9)
@@ -37,12 +48,11 @@ summary(pm.em, point.est = mean, level = .9)
 pm.pairs = pairs(pm.emt)
 summary(pm.pairs, point.est = mean, level = .9)
 
-tidy(apm)
-nd1 <-expand.grid(Treatment = c("C", "D", "I", "E"),
-                  Incubation = c(2),
-                  Mesocosm = "E2")
 
-nd2 <- crossing()
+post_apm <- posterior_samples(apm) %>% select(-lp__) %>% round(digits = 3)
+
+
+
 
 hm = brm(bf(aHF ~ Treatment 
             * Incubation
