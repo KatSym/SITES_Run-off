@@ -1,7 +1,7 @@
 mydates <- as.Date(c("2022-07-11", "2022-07-19", "2022-07-27"))
 mydays <- c(1, 3, 5) # sampling days
 
-absorbance <- read_xlsx("Erken DOM absorbence data.xlsx", 
+absorbance <- read_xlsx("Data/Erken DOM absorbence data.xlsx", 
                         sheet = 1, 
                         range = "A2:G68",
                         col_names = T,
@@ -14,7 +14,7 @@ absorbance[sapply(absorbance, is.na)] <- 2022-07-27
 
 
 
-TP_Chla <- read_xlsx("TP Chl Erken and Bolmen.xlsx", 
+TP_Chla <- read_xlsx("Data/TP Chl Erken and Bolmen.xlsx", 
                      sheet = 1, 
                      range = "A3:M103",
                      col_names = T,

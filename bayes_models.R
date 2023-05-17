@@ -1,12 +1,14 @@
 library(brms)
 library(tidybayes)
+library(modelr)
 library(emmeans)
-library(scales)
-library(loo)
-library(broom)
-library(broom.mixed) 
+# library(scales)
+# library(loo)
+# library(broom)
+# library(broom.mixed) 
 
 # abundance
+
 
 ap.m = brm(bf(aPF ~ Treatment
             + Incubation
@@ -16,8 +18,8 @@ ap.m = brm(bf(aPF ~ Treatment
          chains = 4,
          iter = 2000,
          cores = 4,
-         control = list(adapt_delta=0.95),
-         seed=543,
+         control = list(adapt_delta = 0.95),
+         seed = 543,
          backend = "cmdstanr", 
          data = dat,
          file = "models/ap.m"
@@ -26,6 +28,68 @@ pp_check(ap.m, ndraws = 100)
 summary(ap.m, prob = .9)
 plot(conditional_effects(ap.m, categorical = F, prob = .9), ask = FALSE)
 plot(ap.m, ask = F)
+
+ap.m1 = brm(bf(aPF ~ Treatment
+            + Incubation
+            + Treatment:Incubation
+            + (1|Mesocosm)
+            + ar(p =1)),
+         family = lognormal(link = "identity", link_sigma = "log"),
+         chains = 4,
+         iter = 2000,
+         cores = 4,
+         control = list(adapt_delta = 0.99),
+         seed = 543,
+         backend = "cmdstanr", 
+         data = dat,
+         # file = "models/ap.m1"
+)
+pp_check(ap.m1, ndraws = 100)
+summary(ap.m1, prob = .9)
+plot(conditional_effects(ap.m1, categorical = F, prob = .9), ask = FALSE)
+plot(ap.m1, ask = F)
+
+
+ap.m3 = brm(bf(aPF ~ Treatment
+               + (1|Mesocosm)
+               + ar(time = Incubation, p=1)),
+            family = lognormal(link = "identity", link_sigma = "log"),
+            chains = 4,
+            iter = 2000,
+            cores = 4,
+            control = list(adapt_delta = 0.99),
+            seed = 543,
+            backend = "cmdstanr", 
+            data = dat,
+            # file = "models/ap.m1"
+)
+
+
+
+
+
+ap.m2 = brm(bf(aPF ~ Treatment
+               + (1|Mesocosm)
+               + (1|Incubation)),
+            family = lognormal(link = "identity", link_sigma = "log"),
+            chains = 4,
+            iter = 2000,
+            cores = 4,
+            control = list(adapt_delta = 0.99),
+            seed = 543,
+            backend = "cmdstanr", 
+            data = dat,
+            # file = "models/ap.m1"
+)
+pp_check(ap.m2, ndraws = 100)
+summary(ap.m2, prob = .9)
+plot(conditional_effects(ap.m2, categorical = F, prob = .9), ask = FALSE)
+plot(ap.m2, ask = F)
+
+
+f1 <- loo(ap.m, is_method = "psis")
+f2 <- loo(ap.m2, is_method = "psis")
+loo_compare(f1, f2)
 
 ap.cef <- conditional_effects(ap.m, categorical = F, prob = .9)
 plot(ap.cef, plot = F)[[3]] +
@@ -259,7 +323,7 @@ bm.m1 = brm(bf(MF ~ Treatment
          seed=543,
          backend = "cmdstanr", 
          data = bdat,
-         # file = "models/bm.m",
+         file = "models/bm.m",
          # file_refit = "on_change"
          )
 pp_check(bm.m1, ndraws = 100)
@@ -359,8 +423,7 @@ hir.m = brm(bf(HFir ~ Treatment
           seed=543,
           backend = "cmdstanr", 
           data = IR1,
-          file = "models/hir.m"
-          )
+          file = "models/hir.m")
 
 pp_check(hir.m, ndraws = 100)
 summary(hir.m, prob = .9)
@@ -405,13 +468,13 @@ mgr.m = brm(bf(Gm ~ Treatment
             control = list(adapt_delta=0.95),
             seed = 543,
             backend = "cmdstanr", 
-            data = GR1, 
-            # file = "models/mgr.m"
+            data = GR, 
+            file = "models/mgr.m"
             )
 
 pp_check(mgr.m, ndraws = 100)
 summary(mgr.m, prob = .9)
-plot(conditional_effects(mgr.m, categorical = F, prob = .9), ask = FALSE)
+plot(conditional_effects(mgr.m, categorical = F, prob = .9), ask = FALSE, main = "Mixotr grazing rate - flb/hb")
 plot(mgr.m)
 
 # plot
@@ -427,7 +490,8 @@ plot(mgr.cef, plot = F)[[3]] +
         panel.background = element_rect(fill = "grey98"),
         axis.text.x = element_text(size = 10),
         strip.text.x = element_text(size= 12))+
-  labs(y = "MIxotroph ingestion rate FLB/cell Hr")
+  labs(y = "MIxotroph ingestion rate FLB/cell Hr")+
+  ggtitle("Mixotr grazing rate - hb/flb")
 
 # slopes for each treatment
 mir.emt= emtrends(mir.m, "Treatment", var = "Incubation")
@@ -453,10 +517,145 @@ hgr.m = brm(bf(Gh ~ Treatment
             control = list(adapt_delta=0.95),
             seed=543,
             backend = "cmdstanr", 
-            data = GR1,
-            # file = "models/hir.m"
+            data = GR,
+            file = "models/hir.m"
 )
 pp_check(hgr.m, ndraws = 100)
 summary(hgr.m, prob = .9)
 plot(conditional_effects(hgr.m, categorical = F, prob = .9), ask = FALSE)
 plot(hgr.m)
+
+##  plots =========
+### abundance====
+abund_lst = list(ap.m, ah.m, am.m)
+
+ab <- lapply(abund_lst, function(a) dat %>%
+                 group_by(Mesocosm, Treatment) %>% 
+                 data_grid(Incubation = seq_range(Incubation, n = 101)) %>% 
+                 add_epred_draws(a,
+                                 re_formula = NA,
+                                 # ndraws = 100
+                 ))
+ab.df <- map_dfr(ab, ~ as.data.frame(.x), .id = "id") %>% 
+  mutate(group = case_when(id == 1 ~ "Phot",
+                           id == 2 ~ "Het",
+                           id == 3 ~ "Mix"))
+
+
+
+datt <- dat %>% 
+  select(Incubation, Treatment, Mesocosm, Mes_ID, aPF, aHF, aMFc) %>% 
+  pivot_longer(cols = c(aHF, aPF, aMFc), names_to = "group", values_to = "abundance") %>% 
+  mutate(group = case_when(group == "aHF" ~ "Het",
+                           group == "aPF" ~ "Phot",
+                           group == "aMFc" ~ "Mix"))
+
+
+ab.df %>% 
+  ggplot(., aes(x = Incubation,
+                y = abundance,
+                colour = Treatment,
+                fill = Treatment)) +
+  geom_point(data = datt, 
+             aes(x = Incubation, 
+                 y = abundance, 
+                 colour = Treatment), 
+             # inherit.aes = FALSE, 
+             position = position_jitter(width = .02),
+             alpha = .6) +
+  facet_grid(rows = vars(group),
+             scales = "free_y") +
+  # geom_line(aes(y = .epred, 
+  #               group = paste(Treatment, .draw)), alpha = .2) +
+  stat_lineribbon(aes(y = (.epred)),
+                  .width = .9,
+                  point_interval = "mean_hdi",
+                  size = 1,
+                  alpha = .35,
+                   # fill_ramp(from = trt.cols)
+                  ) +
+  scale_x_continuous(breaks = c(1, 2, 3), 
+                     labels = c(5, 13, 21)) +
+  scale_color_manual(values = trt.cols,
+                     aesthetics = c("colour")) +
+  # scale_color_manual(values =  c("#333333", "#0a8754", "#4472ca", "#e84855")) +
+  scale_fill_manual(values = c("#b3b3b3", "#54ab87", "#7c9cda", "#f19199")) +
+  # scale_fill_manual(values = c("#5e5e5e", "#54be86","#82a7ff",  "#ff7177")) +  
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text = element_text(size = 11),
+        axis.title = element_text(size = 11),
+        # axis.text.y = element_text(size = 12),
+        strip.text.y = element_text(size = 12)) +
+  labs(y = "Abundance cells/mL",
+       x = "Experimental day") 
+ggsave("abund.png", dpi = 300)
+
+
+### biomass=====
+bio_lst = list(bp.m, bh.m, bm.m1)
+
+bio <- lapply(bio_lst, function(a) bdat %>%
+               group_by(Mes_ID, Treatment) %>% 
+               data_grid(Incubation = seq_range(Incubation, n = 101)) %>% 
+               add_epred_draws(a,
+                               re_formula = NA,
+                               # ndraws = 100
+               ))
+bio.df <- map_dfr(bio, ~ as.data.frame(.x), .id = "id") %>% 
+  mutate(group = case_when(id == 1 ~ "Phototroph",
+                           id == 2 ~ "Heterotroph",
+                           id == 3 ~ "Mixotroph"))
+
+
+
+bdatt <- bdat %>% 
+  select(Incubation, Treatment, Mes_ID, PF, HF, MF) %>% 
+  pivot_longer(cols = c(HF, PF, MF), names_to = "group", values_to = "biomass") %>% 
+  mutate(group = case_when(group == "PF" ~ "Phototroph",
+                           group == "HF" ~ "Heterotroph",
+                           group == "MF" ~ "Mixotroph")) %>% 
+  mutate(group = fct_relevel(group, c("Phototroph", "Heterotroph", "Mixotroph")))
+
+
+bio.df %>% 
+  ggplot(., aes(x = Incubation,
+                y = biomass,
+                colour = Treatment,
+                fill = Treatment)) +
+  geom_point(data = bdatt, 
+             aes(x = Incubation, 
+                 y = biomass, 
+                 colour = Treatment), 
+             # inherit.aes = FALSE, 
+             position = position_jitter(width = .02),
+             alpha = .6) +
+  facet_grid(rows = vars(group),
+             scales = "free_y") +
+  # geom_line(aes(y = .epred, 
+  #               group = paste(Treatment, .draw)), alpha = .2) +
+  stat_lineribbon(aes(y = (.epred)),
+                  .width = .9,
+                  point_interval = "mean_hdi",
+                  size = 1,
+                  alpha = .35,
+                  # fill_ramp(from = trt.cols)
+  ) +
+  scale_x_continuous(breaks = c(1, 2, 3), 
+                     labels = c(5, 13, 21)) +
+  # scale_color_manual(values = trt.cols) +
+  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
+  # scale_color_manual(values =  c("#000000", "#05472c", "#243c6a", "#682026")) +
+  scale_fill_manual(values = c("#b3b3b3", "#54ab87", "#7c9cda", "#f19199")) +
+  # scale_fill_manual(values = c("#5e5e5e", "#54be86","#82a7ff",  "#ff7177")) +  
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text = element_text(size = 11),
+        axis.title = element_text(size = 11),
+        # axis.text.y = element_text(size = 12),
+        strip.text.y = element_text(size = 12)) +
+  labs(y = "Biomass pg C/mL",
+       x = "Experimental day") 
+ggsave("abund.png", dpi = 300)

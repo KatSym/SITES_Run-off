@@ -19,6 +19,30 @@ coef(dir1)
 
 
 
+dbio <- bdat %>% 
+  select(-Replicate) %>% 
+  mutate(tot = HF+PF+MF,
+         # calculate proportions
+         h = HF/tot,
+         p = PF/tot,
+         m = MF/tot,
+         
+         # first log transform then proportion, I tried directly transforming 
+         # the proportion but the Y variable must sum to 1
+         lpf = log1p(PF),
+         lhf = log1p(HF),
+         lmf = log1p(MF),
+         ltot = lpf+ lhf+ lmf,
+         lh = lhf/ltot,
+         lp = lpf/ltot,
+         lm = lmf/ltot) 
+
+dbio$Y <- cbind(p = dbio$p, h = dbio$h, m = dbio$m)
+dbio$lY <- cbind(lp = dbio$lp, lh = dbio$lh, lm = dbio$lm)
+
+
+
+
 
 # BAYESIAN
 
@@ -26,73 +50,30 @@ coef(dir1)
 # https://numerilab.io/en/analysis_projects/DirichletElections 
 
 
-library(tidyverse)
-library(rgdal)
-library(knitr)
-library(kableExtra)
-
-data$Y <- cbind(h = data$h, m = data$m, 
-               p = data$p)
-
-library(brms)
-bd1 <- bf(Y ~ Treatment 
-          + Incubation
-          + (1|Mes_ID),
-           family = dirichlet)
-
-get_prior(bd1, data = data) %>% 
-  kable() %>% 
-  kable_styling() %>%
-  scroll_box(width = "100%", height = "300px")
-
-curve(dnorm(x, 0, 1), from = -10, to = 10)
-curve(dnorm(x, 0, 2), from = -10, to = 10, add = T, col = "blue")
-curve(dnorm(x, 0, 10), from = -10, to = 10, add = T, col = "red")
-
-## Prior chosen by brms
-curve(dgamma(x, 0.01, rate = 0.01), to = 30, ylim = c(0, 0.040))
-## Prior we will define
-curve(dstudent_t(x, 3, 0, 10), to = 30, add = T, col = "red")
-
-# I HAVE 0s SO i CANNOT RUN IT LIKE THAT
-
-## Set prior with sd = 1
-priors_1 <- c(prior(normal(0,1), class = b),
-              prior(normal(0,1), class = Intercept),
-              prior(student_t(3, 0, 10), class = phi))
-## sample from the priors
-ppp_1 <- brm(formula = bd1, prior = priors_1, 
-             data = data, sample_prior = "only",
-             chains = 1, cores = 1)
-## Set prior with sd = 2
-priors_2 <- c(prior(normal(0,2), class = b),
-              prior(normal(0,1), class = Intercept),
-              prior(student_t(3, 0, 10), class = phi))
-## sample from the priors
-ppp_2 <- brm(formula = bd1, prior = priors_2, 
-             data = data, sample_prior = "only",
-             chains = 1, cores = 1)
-## Set prior with sd = 2
-priors_10 <- c(prior(normal(0,10), class = b),
-               prior(normal(0,1), class = Intercept),
-               prior(student_t(3, 0, 10), class = phi))
-## sample from the priors
-ppp_10 <- brm(formula = bd1, prior = priors_10, 
-              data = data, sample_prior = "only",
-              chains = 1, cores = 1)
-
-
-
-
-
-
-
-bd2 <- brm(bf(HF_dataal ~ Treatment 
-              + Incubation
-              + (1|Mesocosm),
+bd2 <- brm(bf(Y ~ Treatment 
+              * Incubation
+              + (1|Mes_ID)),
            family = dirichlet(),
            chains = 4,
            iter = 2000,
            cores = 4,
            backend = "cmdstanr", 
-           data = data)
+           data = dbio)
+
+# pp_check(bd2, ndraws = 100)
+summary(bd2, prob = .9)
+plot(conditional_effects(bd2, categorical = T, prob = .9), ask = FALSE)
+plot(bd2, ask = F)
+
+log.mdir <- brm(bf(lY ~ Treatment 
+              * Incubation
+              + (1|Mes_ID)),
+           family = dirichlet(),
+           chains = 4,
+           iter = 2000,
+           cores = 4,
+           backend = "cmdstanr", 
+           data = dbio)
+summary(log.mdir, prob = .9)
+plot(conditional_effects(log.mdir, categorical = T, prob = .9), ask = FALSE)
+plot(log.mdir, ask = F)

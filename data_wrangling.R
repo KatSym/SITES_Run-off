@@ -2,12 +2,18 @@
 library(tidyverse)
 library(readxl)
 
+#needed for the plots 
+trt.cols <- c(`C`= "#000000", #black - C
+              `D`= "#0a8754", #g - D
+              `I`= "#4472ca", #blu - I
+              `E`= "#e84855") #r - E
+
 
 ## DATA ======
 ## and some data wrangling
 
 ## ABUNDANCE
-master.dat <- read_xlsx("SITES_microscope_data_working.xlsx", 
+master.dat <- read_xlsx("Data/SITES_microscope_data_working.xlsx", 
                         sheet = "0.8_samples", 
                         range = "A1:Q217", 
                         col_names = T)
@@ -48,14 +54,14 @@ partial_dat <- within(partial_dat, Cells_counted <- ifelse(is.na(Cells_counted),
 # Load the size data. If the number of cells (rows) are more than 30 withing the Incubation - Treatment
 # - GROUP grouping, select only 30. This is done in a new df. Then take the <30 rows group and merge them with 
 # the new df.
-size.dat <- read_xlsx("SITES_microscope_data_working.xlsx", 
+size.dat <- read_xlsx("Data/SITES_microscope_data_working.xlsx", 
                       sheet = "Sizes", 
-                      range = "A1:C2043",
+                      range = "A1:C2053",
                       col_names = T) %>% 
   
   separate(Label, into = c("inc", "Bag", "time", "filter", "image"), sep = "_", remove = T) %>%
   select(-c(time, filter, image)) %>% 
-  mutate(letter = rep(c("h", "d"), 1021)) %>% 
+  mutate(letter = rep(c("h", "d"), 1026)) %>% 
   pivot_wider(names_from = letter, values_from = Length) %>% 
   unnest(cols = c(h, d)) %>% 
   mutate(vol = (pi/6)*d^2*h, # prolate spheroid in um^3
@@ -81,7 +87,7 @@ sz.data <- size.dat %>%
 
 ## INGESTION
 
-ingest <- read_xlsx("SITES_microscope_data_working.xlsx", 
+ingest <- read_xlsx("Data/SITES_microscope_data_working.xlsx", 
                     sheet = "Ingestion",  
                     range = "A1:K5361", # change accordingly
                     col_names = T) 
@@ -146,4 +152,36 @@ bdat <- dat %>%
   mutate(biomass = abundance * (0.216*mean.cell.vol^0.939)) %>%  # Menden-Deuer Lessard 2000, pgC/mL
   select(Incubation, Treatment, Mes_ID, Replicate, GROUP, biomass) %>% 
   pivot_wider(names_from = GROUP, values_from = biomass, values_fn = mean)
-dataa$MF[is.na(dataa$MF)] <- 0
+bdat$MF[is.na(bdat$MF)] <- 0
+
+## BACTERIA
+
+bact.dat <- read_xlsx("Data/SITES_microscope_data_working.xlsx", 
+                      sheet = "0.2_samples",  
+                      range = "A1:M109", # change accordingly
+                      col_names = T) %>% 
+  
+  mutate(factor = (5 * Area)/(pi * (21/2)^2),
+         HB_abund = HB/(Fields_counted*factor),
+         FLB_abund = FLB/(Fields_counted*factor),
+         CY_abund = CY/(Fields_counted*factor),
+         FLB_perc = FLB_abund/HB_abund,
+         Treatment = fct_relevel(Treatment, c("C","D","I","E"))) %>% 
+  select(-c(CY, FLB, HB, Fields_counted, factor, Area))
+
+bact.dat$Mesocosm <- as.factor(bact.dat$Mesocosm)
+bact.dat$Mes_ID <- as.factor(bact.dat$Mes_ID)
+
+GR <- IR1 %>% 
+  left_join(., bact.dat, by = c("Incubation", "Treatment", "Mesocosm", "Mes_ID", "Replicate")) %>% 
+  mutate(
+    Gm = (flb_MF_corr*HB_abund/FLB_abund)*0.5,
+    Gh = (flb_HF_corr*HB_abund/FLB_abund)*0.5) %>% 
+  select(-contains(c("cells", "Tstart")), -Sample, -Time_point, -Date) 
+GR[sapply(GR, is.infinite)] <- 0
+GR[sapply(GR, is.nan)] <- 0
+GR$Gh[GR$Gh<0] <- 0
+GR$Gm[GR$Gm<0] <- 0
+
+
+# remove(master.dat, partial_dat, size.dat, sz.many, sz.data, ingest, ING)
