@@ -415,6 +415,7 @@ hir.m = brm(bf(HFir ~ Treatment
              hu ~ Treatment 
              + Incubation
              + (1|Mesocosm)),
+            # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
           family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
           chains = 4,
           iter = 2000,
@@ -423,7 +424,8 @@ hir.m = brm(bf(HFir ~ Treatment
           seed=543,
           backend = "cmdstanr", 
           data = IR1,
-          file = "models/hir.m")
+          file = "models/hir.m"
+          )
 
 pp_check(hir.m, ndraws = 100)
 summary(hir.m, prob = .9)
@@ -462,6 +464,7 @@ mgr.m = brm(bf(Gm ~ Treatment
                + Incubation
                + (1|Mesocosm)),
             family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
+            # family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
             chains = 4,
             iter = 2000,
             cores = 4,
@@ -510,7 +513,8 @@ hgr.m = brm(bf(Gh ~ Treatment
                hu ~ Treatment 
                + Incubation
                + (1|Mesocosm)),
-            family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
+            family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
+            # family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
             chains = 4,
             iter = 2000,
             cores = 4,
@@ -518,12 +522,28 @@ hgr.m = brm(bf(Gh ~ Treatment
             seed=543,
             backend = "cmdstanr", 
             data = GR,
-            file = "models/hir.m"
+            # file = "models/hir.m"
 )
 pp_check(hgr.m, ndraws = 100)
 summary(hgr.m, prob = .9)
 plot(conditional_effects(hgr.m, categorical = F, prob = .9), ask = FALSE)
 plot(hgr.m)
+
+# plot
+hgr.cef <- conditional_effects(hgr.m, categorical = F, prob = .9)
+plot(hgr.cef, plot = F)[[3]] +
+  geom_line(size =1.2)+
+  scale_color_manual(values = trt.cols, aesthetics = c("colour", "fill")) +
+  geom_point(data = GR, aes(x = Incubation, y = Gh, colour = Treatment), 
+             inherit.aes = FALSE, position = position_jitter(width=0.12),
+             alpha = 0.5)+
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text.x = element_text(size = 10),
+        strip.text.x = element_text(size= 12))+
+  labs(y = "MIxotroph ingestion rate FLB/cell Hr")+
+  ggtitle("Mixotr grazing rate - hb/flb")
 
 ##  plots =========
 ### abundance====
@@ -537,18 +557,18 @@ ab <- lapply(abund_lst, function(a) dat %>%
                                  # ndraws = 100
                  ))
 ab.df <- map_dfr(ab, ~ as.data.frame(.x), .id = "id") %>% 
-  mutate(group = case_when(id == 1 ~ "Phot",
-                           id == 2 ~ "Het",
-                           id == 3 ~ "Mix"))
+  mutate(group = case_when(id == 1 ~ "Phototroph",
+                           id == 2 ~ "Heterotroph",
+                           id == 3 ~ "Mixotroph"))
 
 
 
 datt <- dat %>% 
   select(Incubation, Treatment, Mesocosm, Mes_ID, aPF, aHF, aMFc) %>% 
   pivot_longer(cols = c(aHF, aPF, aMFc), names_to = "group", values_to = "abundance") %>% 
-  mutate(group = case_when(group == "aHF" ~ "Het",
-                           group == "aPF" ~ "Phot",
-                           group == "aMFc" ~ "Mix"))
+  mutate(group = case_when(group == "aHF" ~ "Heterotroph",
+                           group == "aPF" ~ "Phototroph",
+                           group == "aMFc" ~ "Mixotroph"))
 
 
 ab.df %>% 
@@ -562,7 +582,7 @@ ab.df %>%
                  colour = Treatment), 
              # inherit.aes = FALSE, 
              position = position_jitter(width = .02),
-             alpha = .6) +
+             alpha = .5) +
   facet_grid(rows = vars(group),
              scales = "free_y") +
   # geom_line(aes(y = .epred, 
@@ -576,11 +596,10 @@ ab.df %>%
                   ) +
   scale_x_continuous(breaks = c(1, 2, 3), 
                      labels = c(5, 13, 21)) +
-  scale_color_manual(values = trt.cols,
-                     aesthetics = c("colour")) +
-  # scale_color_manual(values =  c("#333333", "#0a8754", "#4472ca", "#e84855")) +
+  # scale_color_manual(values = trt.cols,
+  #                    aesthetics = c("colour")) +
+  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
   scale_fill_manual(values = c("#b3b3b3", "#54ab87", "#7c9cda", "#f19199")) +
-  # scale_fill_manual(values = c("#5e5e5e", "#54be86","#82a7ff",  "#ff7177")) +  
   theme(panel.grid.minor = element_blank(),
         # panel.grid.major = element_blank(),
         panel.background = element_rect(fill = "grey98"),
@@ -590,7 +609,7 @@ ab.df %>%
         strip.text.y = element_text(size = 12)) +
   labs(y = "Abundance cells/mL",
        x = "Experimental day") 
-ggsave("abund.png", dpi = 300)
+ggsave("Plots/20230522_abund.png", dpi = 300)
 
 
 ### biomass=====
@@ -658,4 +677,133 @@ bio.df %>%
         strip.text.y = element_text(size = 12)) +
   labs(y = "Biomass pg C/mL",
        x = "Experimental day") 
-ggsave("abund.png", dpi = 300)
+ggsave("Plots/20230522_biomass.png", dpi = 300)
+
+### ingestion rates =====
+
+ir_lst = list(mir.m, hir.m)
+
+irl <- lapply(ir_lst, function(a) bdat %>%
+                group_by(Mes_ID, Treatment) %>% 
+                data_grid(Incubation = seq_range(Incubation, n = 101)) %>% 
+                add_epred_draws(a,
+                                re_formula = NA,
+                                # ndraws = 100
+                ))
+ir.df <- map_dfr(irl, ~ as.data.frame(.x), .id = "id") %>% 
+  mutate(group = case_when(id == 1 ~ "Mixotroph",
+                           id == 2 ~ "Heterotroph"))
+
+
+
+irdatt <- IR1 %>% 
+  select(Incubation, Treatment, Mes_ID, HFir, MFir) %>% 
+  pivot_longer(cols = c(HFir, MFir), names_to = "group", values_to = "ingrate") %>% 
+  mutate(group = case_when(group == "HFir" ~ "Heterotroph",
+                           group == "MFir" ~ "Mixotroph"))
+
+ir.df %>% 
+  ggplot(., aes(x = Incubation,
+                y = ingrate,
+                colour = Treatment,
+                fill = Treatment)) +
+  geom_point(data = irdatt, 
+             aes(x = Incubation, 
+                 y = ingrate, 
+                 colour = Treatment), 
+             # inherit.aes = FALSE, 
+             position = position_jitter(width = .02),
+             alpha = .5) +
+  facet_grid(rows = vars(group),
+             scales = "free_y") +
+  # geom_line(aes(y = .epred, 
+  #               group = paste(Treatment, .draw)), alpha = .2) +
+  stat_lineribbon(aes(y = (.epred)),
+                  .width = .9,
+                  point_interval = mean_qi,
+                  size = 1,
+                  alpha = .35,
+                  # fill_ramp(from = trt.cols)
+  ) +
+  scale_x_continuous(breaks = c(1, 2, 3), 
+                     labels = c(5, 13, 21)) +
+  # scale_color_manual(values = trt.cols) +
+  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
+  # scale_color_manual(values =  c("#000000", "#05472c", "#243c6a", "#682026")) +
+  scale_fill_manual(values = c("#b3b3b3", "#54ab87", "#7c9cda", "#f19199")) +
+  # scale_fill_manual(values = c("#5e5e5e", "#54be86","#82a7ff",  "#ff7177")) +  
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text = element_text(size = 11),
+        axis.title = element_text(size = 11),
+        # axis.text.y = element_text(size = 12),
+        strip.text.y = element_text(size = 12)) +
+  labs(y = "Ingestion rate FLB/cell hr",
+       x = "Experimental day") 
+ggsave("Plots/20230522_ingestion_rate.png", dpi = 300)
+
+
+### grazing rates =====
+
+gr_lst = list(mgr.m, hgr.m)
+
+grl <- lapply(gr_lst, function(a) bdat %>%
+                group_by(Mes_ID, Treatment) %>% 
+                data_grid(Incubation = seq_range(Incubation, n = 101)) %>% 
+                add_epred_draws(a,
+                                re_formula = NA,
+                                # ndraws = 100
+                ))
+gr.df <- map_dfr(grl, ~ as.data.frame(.x), .id = "id") %>% 
+  mutate(group = case_when(id == 1 ~ "Mixotroph",
+                           id == 2 ~ "Heterotroph"))
+
+
+
+grdatt <- GR %>% 
+  select(Incubation, Treatment, Mes_ID, Gh, Gm) %>% 
+  pivot_longer(cols = c(Gh, Gm), names_to = "group", values_to = "grrate") %>% 
+  mutate(group = case_when(group == "Gh" ~ "Heterotroph",
+                           group == "Gm" ~ "Mixotroph"))
+
+gr.df %>% 
+  ggplot(., aes(x = Incubation,
+                y = grrate,
+                colour = Treatment,
+                fill = Treatment)) +
+  geom_point(data = grdatt, 
+             aes(x = Incubation, 
+                 y = grrate, 
+                 colour = Treatment), 
+             # inherit.aes = FALSE, 
+             position = position_jitter(width = .02),
+             alpha = .5) +
+  facet_grid(rows = vars(group),
+             scales = "free_y") +
+  # geom_line(aes(y = .epred, 
+  #               group = paste(Treatment, .draw)), alpha = .2) +
+  stat_lineribbon(aes(y = (.epred)),
+                  .width = .9,
+                  point_interval = mean_hdi,
+                  size = 1,
+                  alpha = .35,
+                  # fill_ramp(from = trt.cols)
+  ) +
+  scale_x_continuous(breaks = c(1, 2, 3), 
+                     labels = c(5, 13, 21)) +
+  # scale_color_manual(values = trt.cols) +
+  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
+  # scale_color_manual(values =  c("#000000", "#05472c", "#243c6a", "#682026")) +
+  scale_fill_manual(values = c("#b3b3b3", "#54ab87", "#7c9cda", "#f19199")) +
+  # scale_fill_manual(values = c("#5e5e5e", "#54be86","#82a7ff",  "#ff7177")) +  
+  theme(panel.grid.minor = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.background = element_rect(fill = "grey98"),
+        axis.text = element_text(size = 11),
+        axis.title = element_text(size = 11),
+        # axis.text.y = element_text(size = 12),
+        strip.text.y = element_text(size = 12)) +
+  labs(y = "Grazing rate Bacteria/hr",
+       x = "Experimental day") 
+ggsave("Plots/20230522_grazing_rate.png", dpi = 300)
