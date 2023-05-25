@@ -8,6 +8,12 @@ trt.cols <- c(`C`= "#000000", #black - C
               `I`= "#4472ca", #blu - I
               `E`= "#e84855") #r - E
 
+fill.cols <- c(`C`= "#00000090", #black - C
+              `D`= "#0a875490", #g - D
+              `I`= "#4472ca90", #blu - I
+              `E`= "#e8485590") #r - E
+
+
 
 ## DATA ======
 ## and some data wrangling

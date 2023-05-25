@@ -29,6 +29,71 @@ summary(ap.m, prob = .9)
 plot(conditional_effects(ap.m, categorical = F, prob = .9), ask = FALSE)
 plot(ap.m, ask = F)
 
+# log model and plot ------
+lap.m = brm(bf(log10(aPF) ~ Treatment
+              + Incubation
+              + Treatment:Incubation
+              + (1|Mesocosm)),
+           chains = 4,
+           iter = 2000,
+           cores = 4,
+           control = list(adapt_delta = 0.95),
+           seed = 543,
+           backend = "cmdstanr", 
+           data = dat,
+           file = "models/lap.m"
+)
+pp_check(lap.m, ndraws = 100)
+summary(lap.m, prob = .9)
+plot(conditional_effects(lap.m, categorical = F, prob = .9), ask = FALSE)
+plot(lap.m, ask = F)
+
+
+dat %>% 
+  group_by(Mesocosm, Treatment) %>% 
+  data_grid(Incubation = seq_range(Incubation, n = 101)) %>% 
+  add_epred_draws(lap.m,
+                  re_formula = NA,
+                  # ndraws = 100
+  ) %>% 
+  ggplot(., aes(x = Incubation,
+                y = log10(aPF),
+                colour = Treatment,
+                fill = Treatment)) +
+  stat_lineribbon(aes(y = (.epred)),
+                  .width = .9,
+                  point_interval = "mean_hdi",
+                  size = 1,
+                  alpha = .5
+  ) +
+  geom_point(data = dat, 
+             aes(x = Incubation, 
+                 y = log10(aPF), 
+                 colour = Treatment), 
+             # inherit.aes = FALSE, 
+             position = position_jitter(width = .02),
+             alpha = .5) +
+  scale_x_continuous(breaks = c(1, 2, 3), 
+                     labels = c(5, 13, 21)) +
+  # scale_color_manual(values = trt.cols,
+  #                    aesthetics = c("colour")) +
+  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
+  scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        # panel.background = element_rect(fill = "grey98"),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
+        axis.title = element_text(size = 11),
+        # axis.text.y = element_text(size = 12),
+        strip.text.y = element_text(size = 12)) +
+  labs(y = "Log Abundance cells/mL",
+       x = "Experimental day")+
+ggsave("Plots/20230525_log-phot-abund.png", dpi = 300, width = 6.8, height = 2.2,units = "in")
+#----
+
+
 ap.m1 = brm(bf(aPF ~ Treatment
             + Incubation
             + Treatment:Incubation
@@ -110,14 +175,14 @@ pm.emt= emtrends(ap.m, "Treatment", var = "Incubation")
 summary(pm.emt, point.est = mean, level = .9)
 
 # contrasts at intercept, or at specified points across the continuous predictor
-pm.em = emmeans(ap.m, pairwise  ~ Treatment | Incubation)
+# pm.em = emmeans(ap.m, pairwise  ~ Treatment | Incubation)
 pm.em = emmeans (ap.m, pairwise  ~ Treatment | Incubation,
                   at = list(Incubation = c(1, 2, 3)))
 summary(pm.em, point.est = mean, level = .9)
 
 # pairwise comparisons
 pm.pairs = pairs(pm.emt, level = .9)
-x <- summary(pm.pairs, point.est = mean, level = .9)
+summary(pm.pairs, point.est = mean, level = .9)
 
 # post_apm <- posterior_samples(ap.m) %>% select(-lp__) %>% round(digits = 3)
 
@@ -160,20 +225,23 @@ hm.emt= emtrends(ah.m, "Treatment", var = "Incubation")
 summary(hm.emt, point.est = mean, level = .9)
 
 # contrasts at intercept, or at specified points across the continuous predictor
-hm.em = emmeans(hp.m, pairwise  ~ Treatment | Incubation)
-hm.em = emmeans (hp.m, pairwise  ~ Treatment | Incubation,
+hm.em = emmeans(ah.m, pairwise  ~ Treatment | Incubation)
+hm.em = emmeans (ah.m, pairwise  ~ Treatment | Incubation,
                  at = list(Incubation = c(1, 2, 3)))
 summary(hm.em, point.est = mean, level = .9)
 
 # pairwise comparisons
 hm.pairs = pairs(hm.emt, level = .9)
-x <- summary(hm.pairs, point.est = mean, level = .9)
+summary(hm.pairs, point.est = mean, level = .9)
 
 
 
 am.m = brm(bf(aMFc ~ Treatment 
             * Incubation
-            + (1|Mesocosm)),
+            + (1|Mesocosm)
+            # + (1|Incubation)
+            # + (1 + Incubation|Mesocosm)
+            ),
          family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
          chains = 4,
          iter = 2000,
@@ -182,11 +250,17 @@ am.m = brm(bf(aMFc ~ Treatment
          seed=543,
          backend = "cmdstanr", 
          data = dat,
-         file = "models/am.m")
+         
+         file = "models/am.m"
+         )
 pp_check(am.m, ndraws = 100)
 summary(am.m, prob = .9)
 plot(conditional_effects(am.m, categorical = F, prob = .9), ask = FALSE)
 plot(am.m)
+
+loo(am.m) # + (1 + Incubation|Mesocosm)
+loo(am.m1)
+loo_compare(loo(am.m), loo(am.m1))
 
 
 am.cef <- conditional_effects(am.m, categorical = F, prob = .9)
@@ -215,7 +289,7 @@ summary(mm.em, point.est = mean, level = .9)
 
 # pairwise comparisons
 mm.pairs = pairs(mm.emt, level = .9)
-x <- summary(mm.pairs, point.est = mean, level = .9)
+summary(mm.pairs, point.est = mean, level = .9)
 
 
 
@@ -264,7 +338,7 @@ summary(bh.em, point.est = mean, level = .9)
 
 # pairwise comparisons
 bh.pairs = pairs(bh.emt, level = .9)
-x <- summary(bh.pairs, point.est = mean, level = .9)
+summary(bh.pairs, point.est = mean, level = .9)
 
 
 
@@ -307,8 +381,10 @@ bp.emt= emtrends(bp.m, "Treatment", var = "Incubation")
 summary(bp.emt, point.est = mean, level = .9)
 # pairwise comparisons
 bp.pairs = pairs(bp.emt, level = .9)
-x <- summary(bp.pairs, point.est = mean, level = .9)
-
+summary(bp.pairs, point.est = mean, level = .9)
+bp.em = emmeans (bp.m, pairwise  ~ Treatment | Incubation,
+                 at = list(Incubation = c(1, 2, 3)))
+summary(bp.em, point.est = mean, level = .9)
 
 # check missing values
 bm.m1 = brm(bf(MF ~ Treatment 
@@ -352,7 +428,10 @@ bm.emt= emtrends(bm.m1, "Treatment", var = "Incubation")
 summary(bm.emt, point.est = mean, level = .9)
 # pairwise comparisons
 bm.pairs = pairs(bm.emt, level = .9)
-x <- summary(bm.pairs, point.est = mean, level = .9)
+summary(bm.pairs, point.est = mean, level = .9)
+bm.em = emmeans (bm.m1, pairwise  ~ Treatment | Incubation,
+                 at = list(Incubation = c(1, 2, 3)))
+summary(bm.em, point.est = mean, level = .9)
          
 # ingestion rates 
 
@@ -382,6 +461,7 @@ summary(mir.m, prob = .9)
 plot(conditional_effects(mir.m, categorical = F, prob = .9), ask = FALSE)
 plot(mir.m)
 
+
 # plot
 mir.cef <- conditional_effects(mir.m, categorical = F, prob = .9)
 plot(mir.cef, plot = F)[[3]] +
@@ -402,7 +482,10 @@ mir.emt= emtrends(mir.m, "Treatment", var = "Incubation")
 summary(mir.emt, point.est = mean, level = .9)
 # pairwise comparisons
 mir.pairs = pairs(mir.emt, level = .9)
-x <- summary(mir.pairs, point.est = mean, level = .9)
+summary(mir.pairs, point.est = mean, level = .9)
+mir.em = emmeans (mir.m, pairwise  ~ Treatment | Incubation,
+                 at = list(Incubation = c(1, 2, 3)))
+summary(mir.em, point.est = mean, level = .9)
 
 
 
@@ -415,8 +498,8 @@ hir.m = brm(bf(HFir ~ Treatment
              hu ~ Treatment 
              + Incubation
              + (1|Mesocosm)),
-            # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
-          family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
+            family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
+          # family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
           chains = 4,
           iter = 2000,
           cores = 4,
@@ -424,7 +507,7 @@ hir.m = brm(bf(HFir ~ Treatment
           seed=543,
           backend = "cmdstanr", 
           data = IR1,
-          file = "models/hir.m"
+          # file = "models/hir.m"
           )
 
 pp_check(hir.m, ndraws = 100)
@@ -452,8 +535,10 @@ hir.emt= emtrends(hir.m, "Treatment", var = "Incubation")
 summary(hir.emt, point.est = mean, level = .9)
 # pairwise comparisons
 hir.pairs = pairs(hir.emt, level = .9)
-x <- summary(hir.pairs, point.est = mean, level = .9)
-
+summary(hir.pairs, point.est = mean, level = .9)
+hir.em = emmeans (hir.m, pairwise  ~ Treatment | Incubation,
+                  at = list(Incubation = c(1, 2, 3)))
+summary(hir.em, point.est = mean, level = .9)
 
 
 # grazing rates
@@ -497,14 +582,14 @@ plot(mgr.cef, plot = F)[[3]] +
   ggtitle("Mixotr grazing rate - hb/flb")
 
 # slopes for each treatment
-mir.emt= emtrends(mir.m, "Treatment", var = "Incubation")
-summary(mir.emt, point.est = mean, level = .9)
+mgr.emt= emtrends(mgr.m, "Treatment", var = "Incubation")
+summary(mgr.emt, point.est = mean, level = .9)
 # pairwise comparisons
-mir.pairs = pairs(mir.emt, level = .9)
-x <- summary(mir.pairs, point.est = mean, level = .9)
-
-
-
+mgr.pairs = pairs(mgr.emt, level = .9)
+summary(mgr.pairs, point.est = mean, level = .9)
+mgr.em = emmeans (mgr.m, pairwise  ~ Treatment | Incubation,
+                  at = list(Incubation = c(1, 2, 3)))
+summary(mgr.em, point.est = mean, level = .9)
 
 
 hgr.m = brm(bf(Gh ~ Treatment 
@@ -522,7 +607,8 @@ hgr.m = brm(bf(Gh ~ Treatment
             seed=543,
             backend = "cmdstanr", 
             data = GR,
-            # file = "models/hir.m"
+            file = "models/hir.m",
+            file_refit = "on_change"
 )
 pp_check(hgr.m, ndraws = 100)
 summary(hgr.m, prob = .9)
@@ -576,13 +662,6 @@ ab.df %>%
                 y = abundance,
                 colour = Treatment,
                 fill = Treatment)) +
-  geom_point(data = datt, 
-             aes(x = Incubation, 
-                 y = abundance, 
-                 colour = Treatment), 
-             # inherit.aes = FALSE, 
-             position = position_jitter(width = .02),
-             alpha = .5) +
   facet_grid(rows = vars(group),
              scales = "free_y") +
   # geom_line(aes(y = .epred, 
@@ -591,25 +670,37 @@ ab.df %>%
                   .width = .9,
                   point_interval = "mean_hdi",
                   size = 1,
-                  alpha = .35,
+                  alpha = .5,
                    # fill_ramp(from = trt.cols)
                   ) +
+  geom_point(data = datt, 
+             aes(x = Incubation, 
+                 y = abundance, 
+                 colour = Treatment), 
+             # inherit.aes = FALSE, 
+             position = position_jitter(width = .02),
+             alpha = .5) +
+  scale_y_continuous(breaks = waiver(),
+                     # labels = `breaks`/1000
+                     )+
   scale_x_continuous(breaks = c(1, 2, 3), 
                      labels = c(5, 13, 21)) +
   # scale_color_manual(values = trt.cols,
   #                    aesthetics = c("colour")) +
   scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
-  scale_fill_manual(values = c("#b3b3b3", "#54ab87", "#7c9cda", "#f19199")) +
+  scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
   theme(panel.grid.minor = element_blank(),
-        # panel.grid.major = element_blank(),
-        panel.background = element_rect(fill = "grey98"),
-        axis.text = element_text(size = 11),
+        panel.grid.major = element_blank(),
+        # panel.background = element_rect(fill = "grey98"),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),,
         axis.title = element_text(size = 11),
         # axis.text.y = element_text(size = 12),
         strip.text.y = element_text(size = 12)) +
   labs(y = "Abundance cells/mL",
-       x = "Experimental day") 
-ggsave("Plots/20230522_abund.png", dpi = 300)
+       x = "Experimental day")+
+ggsave("Plots/20230525_abund.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
 
 
 ### biomass=====
@@ -643,13 +734,6 @@ bio.df %>%
                 y = biomass,
                 colour = Treatment,
                 fill = Treatment)) +
-  geom_point(data = bdatt, 
-             aes(x = Incubation, 
-                 y = biomass, 
-                 colour = Treatment), 
-             # inherit.aes = FALSE, 
-             position = position_jitter(width = .02),
-             alpha = .6) +
   facet_grid(rows = vars(group),
              scales = "free_y") +
   # geom_line(aes(y = .epred, 
@@ -658,26 +742,31 @@ bio.df %>%
                   .width = .9,
                   point_interval = "mean_hdi",
                   size = 1,
-                  alpha = .35,
+                  alpha = .5,
                   # fill_ramp(from = trt.cols)
   ) +
+  geom_point(data = bdatt, 
+             aes(x = Incubation, 
+                 y = biomass, 
+                 colour = Treatment), 
+             # inherit.aes = FALSE, 
+             position = position_jitter(width = .02),
+             alpha = .5) +
   scale_x_continuous(breaks = c(1, 2, 3), 
                      labels = c(5, 13, 21)) +
-  # scale_color_manual(values = trt.cols) +
+  scale_y_continuous(labels = scales::label_number(scale = 1/1000))+
   scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
-  # scale_color_manual(values =  c("#000000", "#05472c", "#243c6a", "#682026")) +
-  scale_fill_manual(values = c("#b3b3b3", "#54ab87", "#7c9cda", "#f19199")) +
-  # scale_fill_manual(values = c("#5e5e5e", "#54be86","#82a7ff",  "#ff7177")) +  
+  scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
   theme(panel.grid.minor = element_blank(),
-        # panel.grid.major = element_blank(),
-        panel.background = element_rect(fill = "grey98"),
-        axis.text = element_text(size = 11),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
         axis.title = element_text(size = 11),
-        # axis.text.y = element_text(size = 12),
         strip.text.y = element_text(size = 12)) +
-  labs(y = "Biomass pg C/mL",
+  labs(y = "Biomass 10\u00b3 pg C/mL",
        x = "Experimental day") 
-ggsave("Plots/20230522_biomass.png", dpi = 300)
+ggsave("Plots/20230525_biomass_new.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
 
 ### ingestion rates =====
 
@@ -707,41 +796,34 @@ ir.df %>%
                 y = ingrate,
                 colour = Treatment,
                 fill = Treatment)) +
-  geom_point(data = irdatt, 
-             aes(x = Incubation, 
-                 y = ingrate, 
-                 colour = Treatment), 
-             # inherit.aes = FALSE, 
-             position = position_jitter(width = .02),
-             alpha = .5) +
   facet_grid(rows = vars(group),
              scales = "free_y") +
-  # geom_line(aes(y = .epred, 
-  #               group = paste(Treatment, .draw)), alpha = .2) +
   stat_lineribbon(aes(y = (.epred)),
                   .width = .9,
                   point_interval = mean_qi,
                   size = 1,
-                  alpha = .35,
-                  # fill_ramp(from = trt.cols)
+                  alpha = .5,
   ) +
+  geom_point(data = irdatt, 
+             aes(x = Incubation, 
+                 y = ingrate, 
+                 colour = Treatment), 
+             position = position_jitter(width = .02),
+             alpha = .5) +
   scale_x_continuous(breaks = c(1, 2, 3), 
                      labels = c(5, 13, 21)) +
-  # scale_color_manual(values = trt.cols) +
   scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
-  # scale_color_manual(values =  c("#000000", "#05472c", "#243c6a", "#682026")) +
-  scale_fill_manual(values = c("#b3b3b3", "#54ab87", "#7c9cda", "#f19199")) +
-  # scale_fill_manual(values = c("#5e5e5e", "#54be86","#82a7ff",  "#ff7177")) +  
+  scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
   theme(panel.grid.minor = element_blank(),
-        # panel.grid.major = element_blank(),
-        panel.background = element_rect(fill = "grey98"),
-        axis.text = element_text(size = 11),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
         axis.title = element_text(size = 11),
-        # axis.text.y = element_text(size = 12),
         strip.text.y = element_text(size = 12)) +
   labs(y = "Ingestion rate FLB/cell hr",
-       x = "Experimental day") 
-ggsave("Plots/20230522_ingestion_rate.png", dpi = 300)
+       x = "Experimental day") +
+ggsave("Plots/20230525_ingestion_rate.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
 
 
 ### grazing rates =====
@@ -772,38 +854,31 @@ gr.df %>%
                 y = grrate,
                 colour = Treatment,
                 fill = Treatment)) +
-  geom_point(data = grdatt, 
-             aes(x = Incubation, 
-                 y = grrate, 
-                 colour = Treatment), 
-             # inherit.aes = FALSE, 
-             position = position_jitter(width = .02),
-             alpha = .5) +
   facet_grid(rows = vars(group),
              scales = "free_y") +
-  # geom_line(aes(y = .epred, 
-  #               group = paste(Treatment, .draw)), alpha = .2) +
   stat_lineribbon(aes(y = (.epred)),
                   .width = .9,
                   point_interval = mean_hdi,
                   size = 1,
-                  alpha = .35,
-                  # fill_ramp(from = trt.cols)
+                  alpha = .5,
   ) +
+  geom_point(data = grdatt, 
+             aes(x = Incubation, 
+                 y = grrate, 
+                 colour = Treatment), 
+             position = position_jitter(width = .02),
+             alpha = .5) +
   scale_x_continuous(breaks = c(1, 2, 3), 
                      labels = c(5, 13, 21)) +
-  # scale_color_manual(values = trt.cols) +
   scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
-  # scale_color_manual(values =  c("#000000", "#05472c", "#243c6a", "#682026")) +
-  scale_fill_manual(values = c("#b3b3b3", "#54ab87", "#7c9cda", "#f19199")) +
-  # scale_fill_manual(values = c("#5e5e5e", "#54be86","#82a7ff",  "#ff7177")) +  
+  scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
   theme(panel.grid.minor = element_blank(),
-        # panel.grid.major = element_blank(),
-        panel.background = element_rect(fill = "grey98"),
-        axis.text = element_text(size = 11),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
         axis.title = element_text(size = 11),
-        # axis.text.y = element_text(size = 12),
         strip.text.y = element_text(size = 12)) +
   labs(y = "Grazing rate Bacteria/hr",
-       x = "Experimental day") 
-ggsave("Plots/20230522_grazing_rate.png", dpi = 300)
+       x = "Experimental day") +
+ggsave("Plots/20230525_grazing_rate-axis.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
