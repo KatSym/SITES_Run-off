@@ -7,7 +7,10 @@ library(emmeans)
 # library(broom)
 # library(broom.mixed) 
 
-# abundance
+
+## Models ====
+
+### abundance====
 
 
 ap.m = brm(bf(aPF ~ Treatment
@@ -29,7 +32,7 @@ summary(ap.m, prob = .9)
 plot(conditional_effects(ap.m, categorical = F, prob = .9), ask = FALSE)
 plot(ap.m, ask = F)
 
-# log model and plot ------
+#### log model and plot ------
 lap.m = brm(bf(log10(aPF) ~ Treatment
               + Incubation
               + Treatment:Incubation
@@ -64,7 +67,7 @@ dat %>%
                   .width = .9,
                   point_interval = "mean_hdi",
                   size = 1,
-                  alpha = .5
+                  alpha = .7
   ) +
   geom_point(data = dat, 
              aes(x = Incubation, 
@@ -75,10 +78,11 @@ dat %>%
              alpha = .5) +
   scale_x_continuous(breaks = c(1, 2, 3), 
                      labels = c(5, 13, 21)) +
-  # scale_color_manual(values = trt.cols,
+  scale_color_manual(values = trt.cols)+
   #                    aesthetics = c("colour")) +
-  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
-  scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  # scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
+  # scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  scale_fill_manual(values = c("#E5E5E5", "#D6E6E5","#EBF0F9",  "#FCECEE")) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major = element_blank(),
         # panel.background = element_rect(fill = "grey98"),
@@ -90,8 +94,8 @@ dat %>%
         strip.text.y = element_text(size = 12)) +
   labs(y = "Log Abundance cells/mL",
        x = "Experimental day")+
-ggsave("Plots/20230525_log-phot-abund.png", dpi = 300, width = 6.8, height = 2.2,units = "in")
-#----
+ggsave("Plots/20230531_log-phot-abund.png", dpi = 300, width = 6.8, height = 2.2,units = "in")
+#### tests----
 
 
 ap.m1 = brm(bf(aPF ~ Treatment
@@ -291,10 +295,101 @@ summary(mm.em, point.est = mean, level = .9)
 mm.pairs = pairs(mm.emt, level = .9)
 summary(mm.pairs, point.est = mean, level = .9)
 
+### biovol =====
+bv = bvol %>% 
+  # select(Incubation, Treatment, Mesocosm, GROUP, vol) %>% 
+  pivot_wider(names_from = GROUP, values_from = vol) %>% 
+  ungroup()
+
+vol.p = brm(bf(PF ~ Treatment 
+              * Incubation
+              + (1|Mesocosm)),
+           family = lognormal(link = "identity", link_sigma = "log"),
+           chains = 4,
+           iter = 2000,
+           cores = 4,
+           control = list(adapt_delta=0.95),
+           seed=543,
+           backend = "cmdstanr", 
+           data = bv,
+           file = "models/PF_biovol",
+           file_refit = "on_change")
+pp_check(vol.p, ndraws = 100)
+summary(vol.p, prob = .9)
+plot(conditional_effects(vol.p, categorical = F, prob = .9), ask = FALSE)
+plot(vol.p)
+
+# slopes for each treatment
+vp.emt= emtrends(vol.p, "Treatment", var = "Incubation")
+summary(vp.emt, point.est = mean, level = .9)
+# pairwise comparisons
+vp.pairs = pairs(vp.emt, level = .9)
+summary(vp.pairs, point.est = mean, level = .9)
+vp.em = emmeans (vol.p, pairwise  ~ Treatment | Incubation,
+                  at = list(Incubation = c(1, 2, 3)))
+summary(vp.em, point.est = mean, level = .9)
+
+
+vol.h = brm(bf(HF ~ Treatment 
+               * Incubation
+               + (1|Mesocosm)),
+            family = lognormal(link = "identity", link_sigma = "log"),
+            chains = 4,
+            iter = 2000,
+            cores = 4,
+            control = list(adapt_delta=0.95),
+            seed=543,
+            backend = "cmdstanr", 
+            data = bv,
+            file = "models/HF_biovol",
+            file_refit = "on_change")
+pp_check(vol.h, ndraws = 100)
+summary(vol.h, prob = .9)
+plot(conditional_effects(vol.h, categorical = F, prob = .9), ask = FALSE)
+plot(vol.h)
+
+# slopes for each treatment
+vh.emt= emtrends(vol.h, "Treatment", var = "Incubation")
+summary(vh.emt, point.est = mean, level = .9)
+# pairwise comparisons
+vh.pairs = pairs(vh.emt, level = .9)
+summary(vh.pairs, point.est = mean, level = .9)
+vh.em = emmeans (vol.h, pairwise  ~ Treatment | Incubation,
+                 at = list(Incubation = c(1, 2, 3)))
+summary(vh.em, point.est = mean, level = .9)
 
 
 
-# biomass
+vol.m = brm(bf(MF ~ Treatment 
+               * Incubation
+               + (1|Mesocosm)),
+            family = lognormal(link = "identity", link_sigma = "log"),
+            chains = 4,
+            iter = 2000,
+            cores = 4,
+            control = list(adapt_delta=0.95),
+            seed=543,
+            backend = "cmdstanr", 
+            data = bv,
+            file = "models/MF_biovol",
+            file_refit = "on_change")
+pp_check(vol.m, ndraws = 100)
+summary(vol.m, prob = .9)
+plot(conditional_effects(vol.m, categorical = F, prob = .9), ask = FALSE)
+plot(vol.m)
+
+# slopes for each treatment
+vm.emt= emtrends(vol.m, "Treatment", var = "Incubation")
+summary(vm.emt, point.est = mean, level = .9)
+# pairwise comparisons
+vm.pairs = pairs(vm.emt, level = .9)
+summary(vm.pairs, point.est = mean, level = .9)
+vm.em = emmeans (vol.m, pairwise  ~ Treatment | Incubation,
+                 at = list(Incubation = c(1, 2, 3)))
+summary(vm.em, point.est = mean, level = .9)
+
+
+### biomass ====
 bh.m = brm(bf(HF ~ Treatment 
             * Incubation
             + (1|Mes_ID)),
@@ -306,7 +401,8 @@ bh.m = brm(bf(HF ~ Treatment
          seed=543,
          backend = "cmdstanr", 
          data = bdat,
-         file = "models/bh.m")
+         file = "models/bh.m",
+         file_refit = "on_change")
 pp_check(bh.m, ndraws = 100) # not great
 summary(bh.m, prob = .9)
 plot(conditional_effects(bh.m, categorical = F, prob = .9), ask = FALSE)
@@ -433,17 +529,18 @@ bm.em = emmeans (bm.m1, pairwise  ~ Treatment | Incubation,
                  at = list(Incubation = c(1, 2, 3)))
 summary(bm.em, point.est = mean, level = .9)
          
-# ingestion rates 
+### ingestion rates -----
 
 # if I remove incubation 1? -> NO
 # ir23 <- IR1 %>% filter(Incubation!=1)
 
 mir.m = brm(bf(MFir ~ Treatment 
              * Incubation
-             + (1|Mes_ID),
-             hu ~ Treatment 
+             + (1|Mesocosm),
+             hu ~ Treatment
              + Incubation
-             + (1|Mesocosm)),
+             + (1|Mesocosm)
+             ),
           family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
           chains = 4,
           iter = 2000,
@@ -451,8 +548,10 @@ mir.m = brm(bf(MFir ~ Treatment
           control = list(adapt_delta=0.95),
           seed = 543,
           backend = "cmdstanr", 
-          data = IR1, 
-          file = "models/mir.m")
+          data = IR1
+          # , 
+          # file = "models/mir.m"
+          )
 
 pp_check(mir.m, ndraws = 100)
 summary(mir.m, prob = .9)
@@ -506,8 +605,9 @@ hir.m = brm(bf(HFir ~ Treatment
           control = list(adapt_delta=0.95),
           seed=543,
           backend = "cmdstanr", 
-          data = IR1,
-          # file = "models/hir.m"
+          data = IR1
+          # file = "models/hir.m",
+          # file_refit = "on_change"
           )
 
 pp_check(hir.m, ndraws = 100)
@@ -541,7 +641,7 @@ hir.em = emmeans (hir.m, pairwise  ~ Treatment | Incubation,
 summary(hir.em, point.est = mean, level = .9)
 
 
-# grazing rates
+### grazing rates -----
 mgr.m = brm(bf(Gm ~ Treatment 
                * Incubation
                + (1|Mes_ID),
@@ -556,8 +656,8 @@ mgr.m = brm(bf(Gm ~ Treatment
             control = list(adapt_delta=0.95),
             seed = 543,
             backend = "cmdstanr", 
-            data = GR, 
-            file = "models/mgr.m"
+            data = GR1, 
+            # file = "models/mgr.m"
             )
 
 pp_check(mgr.m, ndraws = 100)
@@ -606,9 +706,9 @@ hgr.m = brm(bf(Gh ~ Treatment
             control = list(adapt_delta=0.95),
             seed=543,
             backend = "cmdstanr", 
-            data = GR,
-            file = "models/hir.m",
-            file_refit = "on_change"
+            data = GR1,
+            # file = "models/hir.m",
+            # file_refit = "on_change"
 )
 pp_check(hgr.m, ndraws = 100)
 summary(hgr.m, prob = .9)
@@ -670,7 +770,7 @@ ab.df %>%
                   .width = .9,
                   point_interval = "mean_hdi",
                   size = 1,
-                  alpha = .5,
+                  alpha = .7,
                    # fill_ramp(from = trt.cols)
                   ) +
   geom_point(data = datt, 
@@ -685,23 +785,87 @@ ab.df %>%
                      )+
   scale_x_continuous(breaks = c(1, 2, 3), 
                      labels = c(5, 13, 21)) +
-  # scale_color_manual(values = trt.cols,
+  scale_color_manual(values = trt.cols)+
   #                    aesthetics = c("colour")) +
-  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
-  scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  # scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
+  # scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  scale_fill_manual(values = c("#E5E5E5", "#D6E6E5","#EBF0F9",  "#FCECEE")) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major = element_blank(),
         # panel.background = element_rect(fill = "grey98"),
         panel.background = element_blank(),
         axis.line = element_line(colour = "black", size = .3),
-        axis.text = element_text(size = 11, colour = "black"),,
+        axis.text = element_text(size = 11, colour = "black"),
         axis.title = element_text(size = 11),
         # axis.text.y = element_text(size = 12),
         strip.text.y = element_text(size = 12)) +
-  labs(y = "Abundance cells/mL",
-       x = "Experimental day")+
-ggsave("Plots/20230525_abund.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
+  labs(y = expression(paste("Abundance cells mL" ^{-1})),
+       x = "Experimental day")
+ggsave("Plots/20230531_abund.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
 
+### biovolume =====
+
+bv_lst = list(vol.p, vol.h, vol.m)
+
+bvl <- lapply(bv_lst, function(a) bv %>%
+                group_by(Mesocosm, Treatment) %>% 
+                data_grid(Incubation = seq_range(Incubation, n = 101)) %>% 
+                add_epred_draws(a,
+                                re_formula = NA,
+                                # ndraws = 100
+                ))
+bv.df <- map_dfr(bvl, ~ as.data.frame(.x), .id = "id") %>% 
+  mutate(group = case_when(id == 1 ~ "Phototroph",
+                           id == 2 ~ "Heterotroph",
+                           id == 3 ~ "Mixotroph")) 
+
+
+
+bvdatt <- bv %>% 
+  select(Incubation, Treatment, Mesocosm, PF, HF, MF) %>% 
+  # filter(PF < 700) %>% 
+  pivot_longer(cols = c(HF, PF, MF), names_to = "group", values_to = "biovol") %>% 
+  mutate(group = case_when(group == "PF" ~ "Phototroph",
+                           group == "HF" ~ "Heterotroph",
+                           group == "MF" ~ "Mixotroph")) %>% 
+  mutate(group = fct_relevel(group, c("Phototroph", "Heterotroph", "Mixotroph"))) %>% 
+  drop_na()
+
+bv.df %>% 
+  ggplot(., aes(x = Incubation,
+                y = biovol,
+                colour = Treatment,
+                fill = Treatment)) +
+  facet_grid(rows = vars(group),
+             scales = "free_y") +
+  stat_lineribbon(aes(y = (.epred)),
+                  .width = .9,
+                  point_interval = "mean_hdi",
+                  size = 1,
+                  alpha = .7,
+  ) +
+  geom_point(data = bvdatt, 
+             aes(x = Incubation, 
+                 y = biovol, 
+                 colour = Treatment), 
+             position = position_jitter(width = .02),
+             alpha = .5) +
+  scale_x_continuous(breaks = c(1, 2, 3), 
+                     labels = c(5, 13, 21)) +
+  # change the scale so that PF difference is more visible
+  # scale_y_continuous(limits = c(0, 500))+
+  scale_color_manual(values = trt.cols)+
+  scale_fill_manual(values = c("#E5E5E5", "#D6E6E5","#EBF0F9",  "#FCECEE")) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
+        axis.title = element_text(size = 11),
+        strip.text.y = element_text(size = 12)) +
+  labs(y = "Biovolume \u03bcm\u00b3",
+       x = "Experimental day") 
+ggsave("Plots/20230601_biovol.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
 
 ### biomass=====
 bio_lst = list(bp.m, bh.m, bm.m1)
@@ -742,7 +906,7 @@ bio.df %>%
                   .width = .9,
                   point_interval = "mean_hdi",
                   size = 1,
-                  alpha = .5,
+                  alpha = .7,
                   # fill_ramp(from = trt.cols)
   ) +
   geom_point(data = bdatt, 
@@ -755,8 +919,10 @@ bio.df %>%
   scale_x_continuous(breaks = c(1, 2, 3), 
                      labels = c(5, 13, 21)) +
   scale_y_continuous(labels = scales::label_number(scale = 1/1000))+
-  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
-  scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  # scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
+  # scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  scale_color_manual(values = trt.cols)+
+  scale_fill_manual(values = c("#E5E5E5", "#D6E6E5","#EBF0F9",  "#FCECEE")) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major = element_blank(),
         panel.background = element_blank(),
@@ -764,9 +930,9 @@ bio.df %>%
         axis.text = element_text(size = 11, colour = "black"),
         axis.title = element_text(size = 11),
         strip.text.y = element_text(size = 12)) +
-  labs(y = "Biomass 10\u00b3 pg C/mL",
-       x = "Experimental day") 
-ggsave("Plots/20230525_biomass_new.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
+  labs(y = expression(paste("Biomass ng C mL" ^{-1})),
+       x = "Experimental day") +
+ggsave("Plots/20230531_biomass.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
 
 ### ingestion rates =====
 
@@ -802,7 +968,7 @@ ir.df %>%
                   .width = .9,
                   point_interval = mean_qi,
                   size = 1,
-                  alpha = .5,
+                  alpha = .7,
   ) +
   geom_point(data = irdatt, 
              aes(x = Incubation, 
@@ -812,8 +978,10 @@ ir.df %>%
              alpha = .5) +
   scale_x_continuous(breaks = c(1, 2, 3), 
                      labels = c(5, 13, 21)) +
-  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
-  scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  # scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
+  # scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  scale_color_manual(values = trt.cols)+
+  scale_fill_manual(values = c("#E5E5E5", "#D6E6E5","#EBF0F9",  "#FCECEE")) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major = element_blank(),
         panel.background = element_blank(),
@@ -821,9 +989,9 @@ ir.df %>%
         axis.text = element_text(size = 11, colour = "black"),
         axis.title = element_text(size = 11),
         strip.text.y = element_text(size = 12)) +
-  labs(y = "Ingestion rate FLB/cell hr",
-       x = "Experimental day") +
-ggsave("Plots/20230525_ingestion_rate.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
+  labs(y = expression(paste("Ingestion rate FLB cell" ^{-1}, "hr" ^{-1})),
+       x = "Experimental day") 
+ggsave("Plots/20230531_ingestion_rate.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
 
 
 ### grazing rates =====
@@ -843,7 +1011,7 @@ gr.df <- map_dfr(grl, ~ as.data.frame(.x), .id = "id") %>%
 
 
 
-grdatt <- GR %>% 
+grdatt <- GR1 %>% 
   select(Incubation, Treatment, Mes_ID, Gh, Gm) %>% 
   pivot_longer(cols = c(Gh, Gm), names_to = "group", values_to = "grrate") %>% 
   mutate(group = case_when(group == "Gh" ~ "Heterotroph",
@@ -860,7 +1028,7 @@ gr.df %>%
                   .width = .9,
                   point_interval = mean_hdi,
                   size = 1,
-                  alpha = .5,
+                  alpha = .7,
   ) +
   geom_point(data = grdatt, 
              aes(x = Incubation, 
@@ -870,8 +1038,10 @@ gr.df %>%
              alpha = .5) +
   scale_x_continuous(breaks = c(1, 2, 3), 
                      labels = c(5, 13, 21)) +
-  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
-  scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  # scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
+  # scale_fill_manual(values = c("#cccccc", "#cee7dd","#dae3f4",  "#fadadd")) +
+  scale_color_manual(values = trt.cols)+
+  scale_fill_manual(values = c("#E5E5E5", "#D6E6E5","#EBF0F9",  "#FCECEE")) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major = element_blank(),
         panel.background = element_blank(),
@@ -879,6 +1049,6 @@ gr.df %>%
         axis.text = element_text(size = 11, colour = "black"),
         axis.title = element_text(size = 11),
         strip.text.y = element_text(size = 12)) +
-  labs(y = "Grazing rate Bacteria/hr",
-       x = "Experimental day") +
-ggsave("Plots/20230525_grazing_rate-axis.png", dpi = 300, width = 7.34, height = 5.93, units = "in")
+  labs(y = expression(paste("Grazing rate Bacteria hr" ^{-1})),
+       x = "Experimental day") 
+ggsave("Plots/20230531_grazing_rate-axis.png", dpi = 300, width = 7.34, height = 5.93, units = "in")

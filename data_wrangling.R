@@ -8,10 +8,6 @@ trt.cols <- c(`C`= "#000000", #black - C
               `I`= "#4472ca", #blu - I
               `E`= "#e84855") #r - E
 
-fill.cols <- c(`C`= "#00000090", #black - C
-              `D`= "#0a875490", #g - D
-              `I`= "#4472ca90", #blu - I
-              `E`= "#e8485590") #r - E
 
 
 
@@ -83,6 +79,10 @@ sz.many <- size.dat %>%
   filter(n()>30) %>% 
   slice_sample(n=30) 
 
+bvol = size.dat %>% 
+  filter(n()<=30) %>% 
+  full_join(., sz.many) 
+
 sz.data <- size.dat %>% 
   filter(n()<=30) %>% 
   full_join(., sz.many) %>% 
@@ -113,34 +113,37 @@ ING <- ingest %>%
             flb_ingest = sum(Num_FLB, na.rm = T)) %>% # pay attention here! what's happening with the NAs?
   ungroup() %>% 
   inner_join(., partial_dat %>%
-               select(Incubation, Treatment, Mesocosm, Mes_ID, Replicate, Time_point, Cells_counted),
+               select(Incubation, Treatment, Mesocosm, Mes_ID, Replicate, Time_point),
              by = c("Incubation", "Treatment", "Mesocosm", "Replicate", "Time_point")) %>%
   # mutate(flbc = 100*flb_ingest/Cells_counted) %>% 
-  # for now
-  select(-Cells_counted) %>% 
-  #
   pivot_wider(names_from = c(Time_point, Grazer), 
               values_from = c(cells_feeding, flb_ingest
-                              # , flbc
               )) 
 ING$Mes_ID <- as.factor(ING$Mes_ID)
 
 # correct ingestion rates
 # subtract number of cells with FLB and number of FLB
 IR1 <- ING %>% 
+  inner_join(., partial_dat %>%
+               filter(Time_point == "Tend") %>% 
+               select(Incubation, Treatment, Mesocosm, Mes_ID, Replicate, PF, HF), 
+             by = c("Incubation", "Treatment", "Mesocosm", "Replicate", "Mes_ID")) %>% 
   mutate(
+    pigm_cells_corr = PF + cells_feeding_Tend_MF - cells_feeding_Tstart_MF,
+    het_cells_corr = HF + cells_feeding_Tend_HF - cells_feeding_Tstart_HF,
     feeding_MF_corr = cells_feeding_Tend_MF - cells_feeding_Tstart_MF,
-    feeding_HF_corr = cells_feeding_Tend_HF - cells_feeding_Tstart_HF,
     flb_MF_corr = flb_ingest_Tend_MF - flb_ingest_Tstart_MF,
-    flb_HF_corr = flb_ingest_Tend_HF - flb_ingest_Tstart_HF,
-    MFir = flb_MF_corr/(feeding_MF_corr*0.5),
-    HFir = flb_HF_corr/(feeding_HF_corr*0.5),
+    flb_HF_corr = flb_ingest_Tend_HF - flb_ingest_Tstart_HF, 
+    MFir = flb_MF_corr/(pigm_cells_corr*0.5),
+    HFir = flb_HF_corr/(het_cells_corr*0.5),
     Treatment = fct_relevel(Treatment, c("C","D","I","E"))) %>% 
   select(-contains(c("cells", "Tstart"))) 
 
 #if I replace with NA it gives NA in the summary
 IR1[sapply(IR1, is.infinite)] <- 0
 IR1[sapply(IR1, is.na)] <- 0
+IR1$MFir[IR1$MFir<0] <- 0
+IR1$HFir[IR1$HFir<0] <- 0
 
 dat <- partial_dat %>% 
   filter(Time_point=="Tend") %>% 
@@ -188,6 +191,17 @@ GR[sapply(GR, is.infinite)] <- 0
 GR[sapply(GR, is.nan)] <- 0
 GR$Gh[GR$Gh<0] <- 0
 GR$Gm[GR$Gm<0] <- 0
+
+GR1 <- IR1 %>% 
+  left_join(., bact.dat, by = c("Incubation", "Treatment", "Mesocosm", "Mes_ID", "Replicate")) %>% 
+  mutate(
+    Gm = MFir*HB_abund/FLB_abund,
+    Gh = HFir*HB_abund/FLB_abund) %>% 
+  select(-contains(c("cells", "Tstart")), -Sample, -Time_point, -Date) 
+GR1[sapply(GR1, is.infinite)] <- 0
+GR1[sapply(GR1, is.nan)] <- 0
+GR1$Gh[GR1$Gh<0] <- 0
+GR1$Gm[GR1$Gm<0] <- 0
 
 
 # remove(master.dat, partial_dat, size.dat, sz.many, sz.data, ingest, ING)
