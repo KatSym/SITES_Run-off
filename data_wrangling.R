@@ -154,14 +154,15 @@ dat <- partial_dat %>%
 dat$aMFc[dat$aMFc<0] <- 0
 
 bdat <- dat %>% 
-  select(Treatment, Mes_ID, Replicate, aHF, aMFc, aPF) %>% 
+  select(Incubation, Treatment, Mes_ID, Replicate, aHF, aMFc, aPF) %>% 
   pivot_longer(cols = c(aHF, aPF, aMFc), names_to = "agroup", values_to = "abundance") %>% 
   mutate(GROUP = substring(agroup, 2, 3))  %>% 
-  inner_join(., sz.data, by = c("Treatment", "GROUP")) %>% 
-  mutate(biomass = abundance * (0.216*mean.cell.vol^0.939)) %>%  # Menden-Deuer Lessard 2000, pgC/mL
-  select(Incubation, Treatment, Mes_ID, Replicate, GROUP, biomass) %>% 
-  pivot_wider(names_from = GROUP, values_from = biomass, values_fn = mean)
-bdat$MF[is.na(bdat$MF)] <- 0
+  inner_join(., sz.data, by = c("Incubation", "Treatment", "GROUP")) %>% 
+  mutate(biovol = abundance *mean.cell.vol,
+    biomass = abundance * (0.216*mean.cell.vol^0.939)) %>%  # Menden-Deuer Lessard 2000, pgC/mL
+  select(Incubation, Treatment, Mes_ID, Replicate, GROUP, biomass, biovol) %>% 
+  pivot_wider(names_from = GROUP, values_from =c(biomass, biovol), values_fn = mean)
+# bdat$MF[is.na(bdat$MF)] <- 0
 
 ## BACTERIA
 
