@@ -196,11 +196,8 @@ ev <- env %>%
   select(-c(A420_1, A254_5, A420_5, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy, Temp))
 
 all.data <- data %>% 
-  group_by(ExpDay, Treatment, Mes_ID) %>% 
-  summarise_all(mean, na.rm = T) %>% 
   left_join(., ev, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
-  select(-Replicate, -Incubation, -Mesocosm) %>% 
-  ungroup()
+  select(-Replicate, -Incubation, -Mesocosm) 
 
 # save the above data frame and the colours so you don't have to run all this every time
 save(all.data, trt.cols, file = "all_data.RData")
