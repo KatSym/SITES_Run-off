@@ -18,7 +18,8 @@ absorbance <- read_xlsx("Data/Erken DOM absorbence data.xlsx",
          A254_1 = `Abs. 254 (1 cm)`,
          Mesocosm = `Treatment ID`,
          ExpDay = Day) %>% 
-  mutate(MesID = as.numeric(MesID))
+  mutate(MesID = as.numeric(MesID)) %>% 
+select(-Date)
 # replace NAs with the date; it adds 26 to the origin date = 27
 # absorbance[sapply(absorbance, is.na)] <- as.Date(26, origin = "2022-07-01") 
 
@@ -106,7 +107,15 @@ backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
                   header = T) %>% 
   pivot_longer(cols = 2:117, names_to = "varbl", values_to = "val") %>% 
   separate(varbl, into = c("vrbl", "MesID"), sep = "\\.") %>% 
-  filter(TIMESTAMP %in% c("2022-07-11", "2022-07-12", "2022-07-19","2022-07-20", "2022-07-27", "2022-07-28")) %>% 
+  filter(TIMESTAMP %in% c("2022-07-07",
+                          "2022-07-08",
+                          "2022-07-11", 
+                          "2022-07-12", 
+                          "2022-07-19",
+                          "2022-07-20", 
+                          "2022-07-27", 
+                          "2022-07-28",
+                          "2022-08-12")) %>% 
   pivot_wider(id_cols = c("TIMESTAMP", "MesID"), names_from = "vrbl", values_from = "val") %>% 
   select(-contains("lake")) %>% 
   filter(!is.na(MesID)) %>%   
@@ -114,12 +123,15 @@ backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
          DOsat = DOsat_optode,
          Temp = Temp_optode,
          DOconc = DOconc_optode) %>% 
-  mutate(ExpDay = case_when(TIMESTAMP == "2022-07-11" ~ 4,
+  mutate(ExpDay = case_when(TIMESTAMP == "2022-07-07" ~ 0,
+                            TIMESTAMP == "2022-07-08" ~ 1,
+                            TIMESTAMP == "2022-07-11" ~ 4,
                             TIMESTAMP == "2022-07-12" ~ 5,
                             TIMESTAMP == "2022-07-19" ~ 12,
                             TIMESTAMP == "2022-07-20" ~ 13,
                             TIMESTAMP == "2022-07-27" ~ 20,
-                            TIMESTAMP == "2022-07-28" ~ 21),
+                            TIMESTAMP == "2022-07-28" ~ 21,
+                            TIMESTAMP == "2022-08-12" ~ 36),
          MesID = as.numeric(MesID),
          Treatment = case_when(MesID == 1 | MesID == 7 | MesID == 10 | MesID == 16 ~ "C",
                                MesID == 2 | MesID == 8 | MesID == 11 | MesID == 13 ~ "D",
@@ -151,42 +163,86 @@ env <- full_join(Dnut, TP_Chla, by = c("MesID", "ExpDay")) %>%
 # other nutr in mg/L
 
 
+### Create a data file with all data -----------------
 
-## plots ---------
+data = dat %>% 
+  mutate(ExpDay = case_when(Incubation == 1 ~ 5,
+                            Incubation == 2 ~ 13,
+                            Incubation == 3 ~ 21)) %>% 
+  left_join(., GR1, by = c("Incubation", "Treatment", "Mes_ID", "Replicate")) %>% 
+  left_join(., bdat, by = c("Incubation", "Treatment", "Mes_ID", "Replicate")) %>% 
+  select(-contains(".x"), -contains("Tend"), -contains("corr"), -id, -Sample) %>% 
+  mutate(Mes_ID = as.numeric(as.character(Mes_ID))) %>%
+  rename(M.Ir = MFir.y,
+         H.Ir = HFir.y, 
+         PF_abund = aPF,
+         HF_abund = aHF,
+         MF_abund = aMFc,
+         M.Gr = Gm,
+         H.Gr = Gh,
+         Mesocosm = Mesocosm.y) %>% 
+  as.data.frame() %>% 
+  select(-contains(".y"), -MF, -aMF, -PF, -HF)
 
-# absorbance %>% 
-#   mutate(Treatment = substring(Mesocosm, 1, 1)) %>% 
-#   ggplot(., aes(x = Day, y = A254_1, colour = Treatment)) +
-#   # geom_smooth(aes(group = Treatment, colour = Treatment, fill = Treatment)) +
-#   geom_point(
-#     aes(x = Day, 
-#         y = A420_1, 
-#         colour = Treatment), 
-#     position = position_jitter(width = .02),
-#     alpha = .5) +
-#   # facet_grid(varbl~.,
-#   #            scales = "free_y")+
-#   # scale_x_continuous(breaks = c(0, 1, 2, 3, 5, 9),
-#   #                    labels = c(0, 4, 8, 12, 20, 36)
-#   # ) +
-#   scale_color_manual(values = trt.cols)+
-#   scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
-#   theme(panel.grid.minor = element_blank(),
-#         panel.grid.major = element_blank(),
-#         panel.background = element_blank(),
-#         legend.position = "none",
-#         axis.line = element_line(colour = "black", size = .3),
-#         axis.text = element_text(size = 11, colour = "black"),
-#         axis.title = element_text(size = 11),
-#         strip.text.y = element_text(size = 12)) +
-#   labs(x = "Experimental day") 
+
+
+#### NOTE! The env data don't match with my data on experimental day. They are a day before,
+#### so I change it to be the same
+ev <- env %>% 
+  mutate(ExpDay = case_when(ExpDay == 4 ~ 5,
+                            ExpDay == 12 ~ 13,
+                            ExpDay == 20 ~ 21)) %>% 
+  filter(!is.na(ExpDay)) %>% 
+  select(-c(A420_1, A254_5, A420_5, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy, Temp))
+
+all.data <- data %>% 
+  group_by(ExpDay, Treatment, Mes_ID) %>% 
+  summarise_all(mean, na.rm = T) %>% 
+  left_join(., ev, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
+  select(-Replicate, -Incubation, -Mesocosm) %>% 
+  ungroup()
+
+# save the above data frame and the colours so you don't have to run all this every time
+save(all.data, trt.cols, file = "all_data.RData")
+
+# plots ---------
+
+absorbance %>%
+  drop_na() %>% 
+  filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
+  mutate(Treatment = substring(Mesocosm, 1, 1)) %>%
+  ggplot(., aes(x = as.factor(ExpDay), y = A254_1, fill = Treatment)) +
+  # geom_smooth(aes(group = Treatment, colour = Treatment, fill = Treatment)) +
+  # geom_point(
+  #   aes(x = ExpDay,
+  #       y = A420_1,
+  #       colour = Treatment),
+  #   position = position_jitter(width = .02),
+  #   alpha = .5) +
+  geom_boxplot(position = "dodge2")+
+  # facet_grid(varbl~.,
+  #            scales = "free_y")+
+  # scale_x_continuous(breaks = c(0, 1, 2, 3, 5, 9),
+  #                    labels = c(0, 4, 8, 12, 20, 36)
+  # ) +
+  scale_fill_manual(values = trt.cols)+
+  # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
+        axis.title = element_text(size = 11),
+        strip.text.y = element_text(size = 12)) +
+  labs(x = "Experimental day")
 
 # Treats %>%
 #   ggplot(., aes(x = Experimental_day, y = intensity, fill = Treatment))+
 #   geom_bar(stat = "identity", position=position_dodge(), width = .6,
 #            # alpha = .3
 #            ) +
-#   scale_fill_manual(values = trt.cols, 
+#   scale_fill_manual(values = trt.cols,
 #                     labels = c("Daily", "Intermediate", "Extreme")) +
 #   scale_x_continuous(limits = c(0, 21),
 #                      expand = c(0, 0),
@@ -205,82 +261,122 @@ env <- full_join(Dnut, TP_Chla, by = c("MesID", "ExpDay")) %>%
 #       # axis.text.y = element_text(size = 12),
 #       strip.text.y = element_text(size = 12),
 #       axis.text.x = element_text(colour = c('black', 'darkred','black', 'darkred','black', 'darkred' ),
-#                                  face = c("plain", "bold", "plain", "bold", "plain", "bold"))) 
+#                                  face = c("plain", "bold", "plain", "bold", "plain", "bold")))
 # ggsave("Plots/20230526_treatments.png", dpi = 300)
-# 
-
-# TP_Chla %>% 
-#   mutate(Treatment = case_when(MesID == 1 | MesID == 7 | MesID == 10 | MesID == 16 ~ "C",
-#                                MesID == 2 | MesID == 8 | MesID == 11 | MesID == 13 ~ "D",
-#                                MesID == 3 | MesID == 5 | MesID == 12 | MesID == 14 ~ "I",
-#                                MesID == 4 | MesID == 6 | MesID == 9 | MesID == 15 ~ "E")) %>% 
-#   ggplot(., aes(x = Date, y = Chla, colour = Treatment)) +
-#   geom_smooth(aes(group = Treatment, colour = Treatment, fill = Treatment)) +
-#   geom_point(
-#     aes(x = Date, 
-#         y = Chla, 
-#         colour = Treatment), 
-#     position = position_jitter(width = .02),
-#     alpha = .5) +
-#   scale_x_continuous(
-#     breaks = c("2022-07-07", "2022-07-11", "2022-07-15", "2022-07-19", ),
-#                      labels = c(0, 4, 8, 12, 20, 36)
-#   ) +
-#   scale_color_manual(values = trt.cols)+
-#   scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
-#   theme(panel.grid.minor = element_blank(),
-#         panel.grid.major = element_blank(),
-#         panel.background = element_blank(),
-#         legend.position = "none",
-#         axis.line = element_line(colour = "black", size = .3),
-#         axis.text = element_text(size = 11, colour = "black"),
-#         axis.title = element_text(size = 11),
-#         strip.text.y = element_text(size = 12)) +
-#   labs(x = "Experimental day",
-#        # y = "mg L\u207b\u2081"
-#        y = "") 
-# 
-# # nutrient plot - comment the filter on the dataframes
-# nuts <- left_join(Dnut, TP_Chla, by = c("Day", "MesID")) %>% 
-#   # filter(complete.cases(.)) %>% 
-#   mutate(Treatment = case_when(MesID == 1 | MesID == 7 | MesID == 10 | MesID == 16 ~ "C",
-#                                MesID == 2 | MesID == 8 | MesID == 11 | MesID == 13 ~ "D",
-#                                MesID == 3 | MesID == 5 | MesID == 12 | MesID == 14 ~ "I",
-#                                MesID == 4 | MesID == 6 | MesID == 9 | MesID == 15 ~ "E"),
-#          # ExDay =case_when(Day == 1 ~ 4,)
-#          ) %>% 
-#   pivot_longer(cols = c("DOC", "DN", "TP"), names_to = "varbl", values_to = "val") 
-# # %>% 
-# #   mutate(val = log1p(val)) %>% 
-# #   group_by(Day, Treatment, MesID, varbl) %>% 
-# #   summarise_all(mean)
 
 
-# nuts %>% 
-#   ggplot(., aes(x = Day, y = val, colour = Treatment)) +
-#   geom_smooth(aes(group = Treatment, colour = Treatment, fill = Treatment)) +
-#   geom_point(
-#     aes(x = Day, 
-#         y = val, 
-#         colour = Treatment), 
-#     position = position_jitter(width = .02),
-#     alpha = .5) +
-#   facet_grid(varbl~.,
-#              scales = "free_y")+
-#   scale_x_continuous(breaks = c(0, 1, 2, 3, 5, 9),
-#     labels = c(0, 4, 8, 12, 20, 36)
-#     ) +
-#   scale_color_manual(values = trt.cols)+
-#   scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
-#   theme(panel.grid.minor = element_blank(),
-#         panel.grid.major = element_blank(),
-#         panel.background = element_blank(),
-#         legend.position = "none",
-#         axis.line = element_line(colour = "black", size = .3),
-#         axis.text = element_text(size = 11, colour = "black"),
-#         axis.title = element_text(size = 11),
-#         strip.text.y = element_text(size = 12)) +
-#   labs(x = "Experimental day",
-#        # y = "mg L\u207b\u2081"
-#        y = "") 
-# ggsave("Plots/20230531_nutrients.png", dpi = 300)
+TP_Chla %>%
+  mutate(Treatment = case_when(MesID == 1 | MesID == 7 | MesID == 10 | MesID == 16 ~ "C",
+                               MesID == 2 | MesID == 8 | MesID == 11 | MesID == 13 ~ "D",
+                               MesID == 3 | MesID == 5 | MesID == 12 | MesID == 14 ~ "I",
+                               MesID == 4 | MesID == 6 | MesID == 9 | MesID == 15 ~ "E")) %>%
+  drop_na() %>% 
+  filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
+  ggplot(., aes(x = as.factor(ExpDay), y = Chla, fill = Treatment)) +
+  # geom_smooth(aes(group = Treatment, colour = Treatment, fill = Treatment)) +
+  geom_boxplot(position = "dodge2")+
+  # geom_point(
+  #   aes(x = Date,
+  #       y = Chla,
+  #       colour = Treatment),
+  #   position = position_jitter(width = .02),
+  #   alpha = .5) +
+  # scale_x_continuous(
+  #   breaks = c("2022-07-07", "2022-07-11", "2022-07-15", "2022-07-19", ),
+  #                    labels = c(0, 4, 8, 12, 20, 36)
+  # ) +
+  scale_fill_manual(values = trt.cols)+
+  # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
+        axis.title = element_text(size = 11),
+        strip.text.y = element_text(size = 12)) +
+  labs(x = "Experimental day",
+       y = "Chla mg L\u207b\u2081")
+
+# nutrient plot - comment the filter on the dataframes
+nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
+  # filter(complete.cases(.)) %>%
+  mutate(Treatment = case_when(MesID == 1 | MesID == 7 | MesID == 10 | MesID == 16 ~ "C",
+                               MesID == 2 | MesID == 8 | MesID == 11 | MesID == 13 ~ "D",
+                               MesID == 3 | MesID == 5 | MesID == 12 | MesID == 14 ~ "I",
+                               MesID == 4 | MesID == 6 | MesID == 9 | MesID == 15 ~ "E"),
+         # ExDay =case_when(Day == 1 ~ 4,)
+         ) %>%
+  pivot_longer(cols = c("DOC", "DN", "TP"), names_to = "varbl", values_to = "val")
+# %>%
+#   mutate(val = log1p(val)) %>%
+#   group_by(Day, Treatment, MesID, varbl) %>%
+#   summarise_all(mean)
+
+
+nuts %>%
+  filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
+  ggplot(., aes(x = as.factor(ExpDay), y = val, fill = Treatment)) +
+  geom_boxplot(position = "dodge2")+
+  # geom_smooth(aes(group = Treatment, colour = Treatment, fill = Treatment)) +
+  # geom_point(
+  #   aes(x = Day,
+  #       y = val,
+  #       colour = Treatment),
+  #   position = position_jitter(width = .02),
+  #   alpha = .5) +
+  facet_wrap(varbl~.,
+             scales = "free_y",
+             # strip.position = "left"
+             )+
+  # scale_x_continuous(breaks = c(0, 1, 2, 3, 5, 9),
+  #   labels = c(0, 4, 8, 12, 20, 36)
+  #   ) +
+  scale_fill_manual(values = trt.cols)+
+  # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
+        axis.title = element_text(size = 11),
+        strip.text.y = element_text(size = 12)) +
+  labs(x = "Experimental day",
+       # y = "mg L\u207b\u2081"
+       y = "")
+ggsave("Plots/20230531_nutrients.png", dpi = 300)
+
+
+env %>% 
+  filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
+  ggplot(., aes(x = as.factor(ExpDay), y = suva, fill = Treatment)) +
+  geom_boxplot(position = "dodge2")+
+   scale_fill_manual(values = trt.cols)+
+  scale_y_continuous(limits = c(0,12))+
+  # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
+        axis.title = element_text(size = 11),
+        strip.text.y = element_text(size = 12))
+
+env %>% 
+  filter(ExpDay %in% c(0, 1, 4, 12, 20, 36)) %>% 
+  ggplot(., aes(x = as.factor(ExpDay), y = PAR, fill = Treatment)) +
+  geom_boxplot(position = "dodge2")+
+  scale_fill_manual(values = trt.cols)+
+  # scale_y_continuous(limits = c(0,12))+
+  # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
+        axis.title = element_text(size = 11),
+        strip.text.y = element_text(size = 12))+
+  labs(x = "Experimental day")

@@ -79,10 +79,6 @@ sz.many <- size.dat %>%
   filter(n()>30) %>% 
   slice_sample(n=30) 
 
-bvol = size.dat %>% 
-  filter(n()<=30) %>% 
-  full_join(., sz.many) 
-
 sz.data <- size.dat %>% 
   filter(n()<=30) %>% 
   full_join(., sz.many) %>% 
