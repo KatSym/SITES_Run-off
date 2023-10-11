@@ -182,25 +182,27 @@ data = dat %>%
          H.Gr = Gh,
          Mesocosm = Mesocosm.y) %>% 
   as.data.frame() %>% 
-  select(-contains(".y"), -MF, -aMF, -PF, -HF)
+  select(-contains(".y"), -c(MF, aMF, PF, HF, Replicate, Incubation, Mesocosm)) %>% 
+  relocate(ExpDay, .before = Treatment)
 
 
 
 #### NOTE! The env data don't match with my data on experimental day. They are a day before,
 #### so I change it to be the same
-ev <- env %>% 
+envir <- env %>% 
   mutate(ExpDay = case_when(ExpDay == 4 ~ 5,
                             ExpDay == 12 ~ 13,
                             ExpDay == 20 ~ 21)) %>% 
   filter(!is.na(ExpDay)) %>% 
+  filter(Mes_ID %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16)) %>% 
   select(-c(A420_1, A254_5, A420_5, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy, Temp))
 
-all.data <- data %>% 
-  left_join(., ev, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
-  select(-Replicate, -Incubation, -Mesocosm) 
+# all.data <- data %>% 
+#   left_join(., ev, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
+#   select(-Replicate, -Incubation, -Mesocosm) 
 
 # save the above data frame and the colours so you don't have to run all this every time
-save(all.data, trt.cols, file = "all_data.RData")
+save(data, envir, trt.cols, file = "all_data.RData")
 
 # plots ---------
 
