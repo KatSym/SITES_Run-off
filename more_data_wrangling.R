@@ -1,5 +1,7 @@
+library(readxl)
 mydates <- as.Date(c("2022-07-11", "2022-07-19", "2022-07-27"))
 mydays <- c(1, 3, 5) # sampling days
+
 
 absorbance <- read_xlsx("Data/Erken DOM absorbence data.xlsx", 
                         # sheet = "absorbance",
@@ -187,15 +189,16 @@ data = dat %>%
 
 
 
-#### NOTE! The env data don't match with my data on experimental day. They are a day before,
-#### so I change it to be the same
 envir <- env %>% 
-  mutate(ExpDay = case_when(ExpDay == 4 ~ 5,
-                            ExpDay == 12 ~ 13,
-                            ExpDay == 20 ~ 21)) %>% 
-  filter(!is.na(ExpDay)) %>% 
-  filter(Mes_ID %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16)) %>% 
-  select(-c(A420_1, A254_5, A420_5, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy, Temp))
+  #### NOTE! The env data don't match with my data on experimental day. They are a day before,
+  #### so I change it to be the same
+  # mutate(ExpDay = case_when(ExpDay == 4 ~ 5,
+  #                           ExpDay == 12 ~ 13,
+  #                           ExpDay == 20 ~ 21)) %>% 
+  # filter(!is.na(ExpDay)) %>% 
+  filter(Mes_ID %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16),
+         ExpDay<=21) %>% 
+  select(-c(A254_5, A420_5, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy, Temp))
 
 # all.data <- data %>% 
 #   left_join(., ev, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
@@ -206,35 +209,46 @@ save(data, envir, trt.cols, file = "all_data.RData")
 
 # plots ---------
 
-absorbance %>%
+
+(a420 <- absorbance %>%
+  filter(A420_1 < 0.1,
+         ExpDay<21) %>% 
   drop_na() %>% 
-  filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
+  # filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
   mutate(Treatment = substring(Mesocosm, 1, 1)) %>%
-  ggplot(., aes(x = as.factor(ExpDay), y = A254_1, fill = Treatment)) +
-  # geom_smooth(aes(group = Treatment, colour = Treatment, fill = Treatment)) +
+   group_by(ExpDay, Treatment) %>% 
+  summarise(
+    sd = sd(A420_1),
+    A420 = mean(A420_1)
+  ) %>% 
+  ggplot(., aes(x = ExpDay, y = A420, color = Treatment)) +
   # geom_point(
   #   aes(x = ExpDay,
   #       y = A420_1,
   #       colour = Treatment),
-  #   position = position_jitter(width = .02),
+  #   # position = position_jitter(width = .02),
   #   alpha = .5) +
-  geom_boxplot(position = "dodge2")+
-  # facet_grid(varbl~.,
-  #            scales = "free_y")+
-  # scale_x_continuous(breaks = c(0, 1, 2, 3, 5, 9),
-  #                    labels = c(0, 4, 8, 12, 20, 36)
-  # ) +
-  scale_fill_manual(values = trt.cols)+
+  # stat_smooth(aes(group = Treatment, colour = Treatment), 
+  #             method = "glm",
+  #             se =F) +
+  geom_errorbar(
+    aes(ymin = A420-sd, ymax = A420+sd, color = Treatment),
+    position = position_dodge(0.3), width = 0.2
+  )+
+  geom_point(aes(color = Treatment), position = position_dodge(0.3)) +
+   geom_line(aes(group = Treatment))+
+  scale_color_manual(values = trt.cols)+
   # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major = element_blank(),
         panel.background = element_blank(),
         legend.position = "none",
         axis.line = element_line(colour = "black", size = .3),
-        axis.text = element_text(size = 11, colour = "black"),
-        axis.title = element_text(size = 11),
-        strip.text.y = element_text(size = 12)) +
-  labs(x = "Experimental day")
+        axis.text.y = element_text(size = 10, colour = "black"),
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 12)) +
+  labs(x = NULL,
+       y = bquote("a"[420]~"(m\u207b\u00b9)")))
 
 # Treats %>%
 #   ggplot(., aes(x = Experimental_day, y = intensity, fill = Treatment))+
@@ -305,7 +319,9 @@ nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
                                MesID == 3 | MesID == 5 | MesID == 12 | MesID == 14 ~ "I",
                                MesID == 4 | MesID == 6 | MesID == 9 | MesID == 15 ~ "E"),
          # ExDay =case_when(Day == 1 ~ 4,)
-         ) %>%
+         ) %>% 
+  filter(ExpDay !=36)
+%>%
   pivot_longer(cols = c("DOC", "DN", "TP"), names_to = "varbl", values_to = "val")
 # %>%
 #   mutate(val = log1p(val)) %>%
@@ -313,61 +329,126 @@ nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
 #   summarise_all(mean)
 
 
-nuts %>%
-  filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
-  ggplot(., aes(x = as.factor(ExpDay), y = val, fill = Treatment)) +
-  geom_boxplot(position = "dodge2")+
-  # geom_smooth(aes(group = Treatment, colour = Treatment, fill = Treatment)) +
+(tp <- nuts %>%
+  group_by(ExpDay, Treatment) %>% 
+  summarise(
+    sd = sd(TP),
+    TP = mean(TP)
+  ) %>% 
+
+  ggplot(., aes(x = ExpDay, y = TP, color = Treatment)) +
+  geom_errorbar(
+    aes(ymin = TP-sd, ymax = TP+sd, color = Treatment),
+    position = position_dodge(0.3), width = 0.2
+  )+
+  geom_point(aes(color = Treatment), position = position_dodge(0.3)) +
+  geom_line(aes(group = Treatment))+
   # geom_point(
-  #   aes(x = Day,
-  #       y = val,
+  #   aes(x = ExpDay,
+  #       y = TP,
   #       colour = Treatment),
-  #   position = position_jitter(width = .02),
-  #   alpha = .5) +
-  facet_wrap(varbl~.,
-             scales = "free_y",
-             # strip.position = "left"
-             )+
-  # scale_x_continuous(breaks = c(0, 1, 2, 3, 5, 9),
-  #   labels = c(0, 4, 8, 12, 20, 36)
-  #   ) +
-  scale_fill_manual(values = trt.cols)+
+  #   alpha = .5)+
+  # stat_smooth(aes(group = Treatment, colour = Treatment), 
+  #             method = "gam",
+  #             formula = y ~ splines::bs(x, 3),
+  #             se =F) +
+  scale_color_manual(values = trt.cols)+
   # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major = element_blank(),
         panel.background = element_blank(),
         legend.position = "none",
         axis.line = element_line(colour = "black", size = .3),
-        axis.text = element_text(size = 11, colour = "black"),
-        axis.title = element_text(size = 11),
-        strip.text.y = element_text(size = 12)) +
+        axis.text = element_text(size = 10, colour = "black"),
+        axis.title = element_text(size = 12)) +
   labs(x = "Experimental day",
-       # y = "mg L\u207b\u2081"
-       y = "")
-ggsave("Plots/20230531_nutrients.png", dpi = 300)
+       y = "Total phosphorus \u00b5g L\u207b\u00b9"))
 
-
-env %>% 
-  filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
-  ggplot(., aes(x = as.factor(ExpDay), y = suva, fill = Treatment)) +
-  geom_boxplot(position = "dodge2")+
-   scale_fill_manual(values = trt.cols)+
-  scale_y_continuous(limits = c(0,12))+
+(tn <- nuts %>%
+  group_by(ExpDay, Treatment) %>% 
+  summarise(
+    sd = sd(TN),
+    TN = mean(TN)
+  ) %>% 
+  
+  ggplot(., aes(x = ExpDay, y = TN, color = Treatment)) +
+  geom_errorbar(
+    aes(ymin = TN-sd, ymax = TN+sd, color = Treatment),
+    position = position_dodge(0.3), width = 0.2
+  )+
+  geom_point(aes(color = Treatment), position = position_dodge(0.3)) +
+  geom_line(aes(group = Treatment))+
+  # stat_smooth(aes(group = Treatment, colour = Treatment), 
+  #             method = "gam",
+  #             formula = y ~ splines::bs(x, 3),
+  #             se =F) +
+  # geom_point(
+  #   aes(x = ExpDay,
+  #       y = TN,
+  #       colour = Treatment))+
+  scale_color_manual(values = trt.cols)+
   # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major = element_blank(),
         panel.background = element_blank(),
         legend.position = "none",
         axis.line = element_line(colour = "black", size = .3),
-        axis.text = element_text(size = 11, colour = "black"),
-        axis.title = element_text(size = 11),
-        strip.text.y = element_text(size = 12))
+        axis.text = element_text(size = 10, colour = "black"),
+        axis.title = element_text(size = 12)) +
+  labs(x = "Experimental day",
+       y = "Total nitrogen mg L\u207b\u00b9"))
 
-env %>% 
-  filter(ExpDay %in% c(0, 1, 4, 12, 20, 36)) %>% 
-  ggplot(., aes(x = as.factor(ExpDay), y = PAR, fill = Treatment)) +
-  geom_boxplot(position = "dodge2")+
-  scale_fill_manual(values = trt.cols)+
+doc <- nuts %>%
+  # filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
+  ggplot(., aes(x = ExpDay, y = DOC, color = Treatment)) +
+  stat_smooth(aes(group = Treatment, colour = Treatment), 
+              method = NULL,
+              se =F) +
+  geom_point(
+    aes(x = ExpDay,
+        y = DOC,
+        colour = Treatment))+
+  scale_color_manual(values = trt.cols)+
+  # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 10, colour = "black"),
+        axis.title = element_text(size = 12)) +
+  labs(x = "Experimental day",
+       y = "Total nitrogen mg L\u207b\u00b9")
+
+
+
+# ggsave("Plots/20230531_nutrients.png", dpi = 300)
+
+
+
+(par <- env %>% 
+  filter(ExpDay > 0 & ExpDay < 21  & PAR < 125) %>%
+    group_by(ExpDay, Treatment) %>% 
+    summarise(
+      sd = sd(PAR),
+      PAR = mean(PAR)
+    ) %>% 
+    
+    ggplot(., aes(x = ExpDay, y = PAR, color = Treatment)) +
+    geom_errorbar(
+      aes(ymin = PAR-sd, ymax = PAR+sd, color = Treatment),
+      position = position_dodge(0.3), width = 0.2
+    )+
+    geom_point(aes(color = Treatment), position = position_dodge(0.3)) +
+    geom_line(aes(group = Treatment))+
+  # stat_smooth(aes(group = Treatment, colour = Treatment), 
+  #             method = "glm",
+  #             se =F) +
+  # geom_point(
+  #   aes(x = ExpDay,
+  #       y = PAR,
+  #       colour = Treatment))+
+  scale_color_manual(values = trt.cols)+
   # scale_y_continuous(limits = c(0,12))+
   # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
   theme(panel.grid.minor = element_blank(),
@@ -375,7 +456,15 @@ env %>%
         panel.background = element_blank(),
         legend.position = "none",
         axis.line = element_line(colour = "black", size = .3),
-        axis.text = element_text(size = 11, colour = "black"),
-        axis.title = element_text(size = 11),
-        strip.text.y = element_text(size = 12))+
-  labs(x = "Experimental day")
+        axis.text.y = element_text(size = 10, colour = "black"), 
+        axis.text.x = element_blank(),
+        axis.title = element_text(size = 12))+
+  labs(x = NULL))
+
+par
+a420
+tn
+tp
+
+plot <- ggarrange(par, a420, tn, tp, ncol = 2, nrow = 2, align = "hv") + bgcolor("White") 
+ggsave("Plots/bckgr_20231029.tiff", plot, dpi = 300)
