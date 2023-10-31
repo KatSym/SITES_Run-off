@@ -20,8 +20,10 @@ absorbance <- read_xlsx("Data/Erken DOM absorbence data.xlsx",
          A254_1 = `Abs. 254 (1 cm)`,
          Mesocosm = `Treatment ID`,
          ExpDay = Day) %>% 
-  mutate(MesID = as.numeric(MesID)) %>% 
-select(-Date)
+select(-Date) %>% 
+  mutate(MesID = as.numeric(MesID),
+         # use the 5cm cuvette and convert to m
+         a420 = 100*A420_5/5)
 # replace NAs with the date; it adds 26 to the origin date = 27
 # absorbance[sapply(absorbance, is.na)] <- as.Date(26, origin = "2022-07-01") 
 
@@ -143,8 +145,17 @@ backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
 
 # arrange(TIMESTAMP) %>% 
   #   mutate(ExpDay = 0:n(TIMESTAMP))
-
-
+rotifers <- read_xlsx("Data/rotifers_volvoxes.xlsx", sheet = 1, range = "A1:K107",
+                      col_names = T) %>% 
+  rename(ExpDay = `day of experiment`,
+         # Mes_ID = mesocosm,
+         Treatment = treatment,
+         vol = `sample volume (ml)`) %>% 
+  filter(mesocosm!="LE") %>% 
+  mutate(rotif = `small rotifers`+ asplanchna + kellicottia,
+         Rot = round(1000*rotif/vol),
+         Mes_ID = as.numeric(mesocosm)) %>%  # rotifers per L 
+  select(ExpDay, Treatment, Mes_ID, Rot)
 
 
 env <- full_join(Dnut, TP_Chla, by = c("MesID", "ExpDay")) %>% 
@@ -158,6 +169,7 @@ env <- full_join(Dnut, TP_Chla, by = c("MesID", "ExpDay")) %>%
          suva = (A254_1/DOC)*100) %>% # L/mg*m
   select(-contains("id", ignore.case = F), -contains("Date"), -Day, -TIMESTAMP, -Mesocosm) %>% 
   rename(Mes_ID = MesID) %>% 
+  left_join(., rotifers, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
   filter(!is.na(Mes_ID)) %>% 
   arrange(ExpDay) %>% 
   as.data.frame()
@@ -198,7 +210,7 @@ envir <- env %>%
   # filter(!is.na(ExpDay)) %>% 
   filter(Mes_ID %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16),
          ExpDay<=21) %>% 
-  select(-c(A254_5, A420_5, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy, Temp))
+  select(-c(A254_5, A420_5, A254_1, A420_1, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy, Temp))
 
 # all.data <- data %>% 
 #   left_join(., ev, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
@@ -211,15 +223,15 @@ save(data, envir, trt.cols, file = "all_data.RData")
 
 
 (a420 <- absorbance %>%
-  filter(A420_1 < 0.1,
-         ExpDay<21) %>% 
+  filter(ExpDay<21) %>% 
   drop_na() %>% 
   # filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
   mutate(Treatment = substring(Mesocosm, 1, 1)) %>%
    group_by(ExpDay, Treatment) %>% 
+   
   summarise(
-    sd = sd(A420_1),
-    A420 = mean(A420_1)
+    sd = sd(a420),
+    A420 = mean(a420)
   ) %>% 
   ggplot(., aes(x = ExpDay, y = A420, color = Treatment)) +
   # geom_point(
@@ -231,6 +243,7 @@ save(data, envir, trt.cols, file = "all_data.RData")
   # stat_smooth(aes(group = Treatment, colour = Treatment), 
   #             method = "glm",
   #             se =F) +
+   geom_vline(aes(xintercept =7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
   geom_errorbar(
     aes(ymin = A420-sd, ymax = A420+sd, color = Treatment),
     position = position_dodge(0.3), width = 0.2
@@ -243,7 +256,7 @@ save(data, envir, trt.cols, file = "all_data.RData")
         panel.grid.major = element_blank(),
         panel.background = element_blank(),
         legend.position = "none",
-        axis.line = element_line(colour = "black", size = .3),
+        axis.line = element_line(colour = "black", linewidth = .3),
         axis.text.y = element_text(size = 10, colour = "black"),
         axis.text.x = element_blank(),
         axis.title = element_text(size = 12)) +
@@ -337,12 +350,14 @@ nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
   ) %>% 
 
   ggplot(., aes(x = ExpDay, y = TP, color = Treatment)) +
+    geom_vline(aes(xintercept =7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
   geom_errorbar(
     aes(ymin = TP-sd, ymax = TP+sd, color = Treatment),
     position = position_dodge(0.3), width = 0.2
   )+
   geom_point(aes(color = Treatment), position = position_dodge(0.3)) +
   geom_line(aes(group = Treatment))+
+    
   # geom_point(
   #   aes(x = ExpDay,
   #       y = TP,
@@ -372,12 +387,14 @@ nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
   ) %>% 
   
   ggplot(., aes(x = ExpDay, y = TN, color = Treatment)) +
+    geom_vline(aes(xintercept =7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
   geom_errorbar(
     aes(ymin = TN-sd, ymax = TN+sd, color = Treatment),
     position = position_dodge(0.3), width = 0.2
   )+
   geom_point(aes(color = Treatment), position = position_dodge(0.3)) +
   geom_line(aes(group = Treatment))+
+    
   # stat_smooth(aes(group = Treatment, colour = Treatment), 
   #             method = "gam",
   #             formula = y ~ splines::bs(x, 3),
@@ -435,12 +452,14 @@ doc <- nuts %>%
     ) %>% 
     
     ggplot(., aes(x = ExpDay, y = PAR, color = Treatment)) +
+    geom_vline(aes(xintercept =7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
     geom_errorbar(
       aes(ymin = PAR-sd, ymax = PAR+sd, color = Treatment),
       position = position_dodge(0.3), width = 0.2
     )+
     geom_point(aes(color = Treatment), position = position_dodge(0.3)) +
     geom_line(aes(group = Treatment))+
+    
   # stat_smooth(aes(group = Treatment, colour = Treatment), 
   #             method = "glm",
   #             se =F) +
@@ -459,12 +478,10 @@ doc <- nuts %>%
         axis.text.y = element_text(size = 10, colour = "black"), 
         axis.text.x = element_blank(),
         axis.title = element_text(size = 12))+
-  labs(x = NULL))
-
-par
-a420
-tn
-tp
-
-plot <- ggarrange(par, a420, tn, tp, ncol = 2, nrow = 2, align = "hv") + bgcolor("White") 
-ggsave("Plots/bckgr_20231029.tiff", plot, dpi = 300)
+  labs(x = NULL,
+       #Photosynthetic photon flux (PPF) micromoles per square meter per second (μmol·m−2·s−1)
+       y = "PAR (μmol m\u207b\u00b2 s\u207b\u00b9)"))
+      
+library(ggpubr)
+plot <- ggarrange(par, a420, tn, tp, ncol = 2, nrow = 2, align = "hv") + bgcolor("white") 
+ggsave("Plots/bckgr_20231030.tiff", plot, dpi = 300)
