@@ -377,7 +377,7 @@ nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
         axis.text = element_text(size = 10, colour = "black"),
         axis.title = element_text(size = 12)) +
   labs(x = "Experimental day",
-       y = "Total phosphorus \u00b5g L\u207b\u00b9"))
+       y = "Total phosphorus (\u00b5g L\u207b\u00b9)"))
 
 (tn <- nuts %>%
   group_by(ExpDay, Treatment) %>% 
@@ -413,7 +413,7 @@ nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
         axis.text = element_text(size = 10, colour = "black"),
         axis.title = element_text(size = 12)) +
   labs(x = "Experimental day",
-       y = "Total nitrogen mg L\u207b\u00b9"))
+       y = "Total nitrogen (mg L\u207b\u00b9)"))
 
 doc <- nuts %>%
   # filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
@@ -484,4 +484,4 @@ doc <- nuts %>%
       
 library(ggpubr)
 plot <- ggarrange(par, a420, tn, tp, ncol = 2, nrow = 2, align = "hv") + bgcolor("white") 
-ggsave("Plots/bckgr_20231030.tiff", plot, dpi = 300)
+ggsave("Plots/bckgr_20231031.tiff", plot, dpi = 300)
