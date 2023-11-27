@@ -48,6 +48,10 @@ dat <- data %>%
 dat1 <- dat %>% filter(ExpDay !="5") %>% droplevels() %>% 
   mutate(Treatment = as.factor(Treatment))
 
+zoop <- full_join(rot1, zoop1, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
+  ungroup() %>% 
+  mutate(ExpDay = as.factor(ExpDay))
+
 # dat2 <- dat %>% select(ExpDay, Treatment, PF_abund, MF_abund, HF_abund) %>% 
 #   group_by(ExpDay,Treatment) %>% 
 #   summarize_all(mean)
@@ -87,6 +91,8 @@ abs.m = brm(bf(a420 ~
             file = "models/231029_abs",
             file_refit = "on_change"
 )
+
+
 pp_check(abs.m)
 summary(abs.m)
 conditional_effects(abs.m, effects = "Treatment:ExpDay")
@@ -223,7 +229,8 @@ pDayTr = pairs(emDayTr)
 summary(pTrDay, point = "mean")
 summary(pDayTr, point = "mean")
 
-rot.m = brm(bf(log1p(Rot) ~ 
+
+tn.m = brm(bf(TN ~ 
                  + Treatment*ExpDay
                + (1|Mes_ID)),
             family = gaussian(link = "identity"),
@@ -236,7 +243,77 @@ rot.m = brm(bf(log1p(Rot) ~
                            step_size = 0.2),
             seed = 543,
             backend = "cmdstanr", 
-            data = env %>% filter(!is.na(Rot)),
+            data = env%>% filter(!is.na(TN)),
+            file = "models/231120_TN",
+            file_refit = "on_change"
+)
+pp_check(tn.m)
+summary(tn.m)
+conditional_effects(tn.m, effects = "Treatment:ExpDay")
+conditional_effects(tn.m, effects = "ExpDay:Treatment")
+
+emTrDay = emmeans(tn.m, ~ Treatment|ExpDay)
+summary(emTrDay, point = "mean")
+pTrDay = pairs(emTrDay)
+
+emDayTr = emmeans(tn.m, ~ ExpDay|Treatment)
+summary(emDayTr, point = "mean")
+pDayTr = pairs(emDayTr)
+
+summary(pTrDay, point = "mean")
+summary(pDayTr, point = "mean")
+
+
+
+tp.m = brm(bf(TP ~ 
+                + Treatment*ExpDay
+              + (1|Mes_ID)),
+           family = gaussian(link = "identity"),
+           # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
+           chains = 4,
+           iter = 2000,
+           cores = 4,
+           control = list(adapt_delta = 0.99,
+                          max_treedepth = 12,
+                          step_size = 0.2),
+           seed = 543,
+           backend = "cmdstanr", 
+           data = env%>% filter(!is.na(TP)),
+           file = "models/231120_TP",
+           file_refit = "on_change"
+)
+pp_check(tp.m)
+summary(tp.m)
+conditional_effects(tp.m, effects = "Treatment:ExpDay")
+conditional_effects(tp.m, effects = "ExpDay:Treatment")
+
+emTrDay = emmeans(tp.m, ~ Treatment|ExpDay)
+summary(emTrDay, point = "mean")
+pTrDay = pairs(emTrDay)
+
+emDayTr = emmeans(tp.m, ~ ExpDay|Treatment)
+summary(emDayTr, point = "mean")
+pDayTr = pairs(emDayTr)
+
+summary(pTrDay, point = "mean")
+summary(pDayTr, point = "mean")
+
+
+
+rot.m = brm(bf(log1p(Rotif) ~ 
+                 + Treatment*ExpDay
+               + (1|Mes_ID)),
+            family = gaussian(link = "identity"),
+            # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
+            chains = 4,
+            iter = 2000,
+            cores = 4,
+            control = list(adapt_delta = 0.99,
+                           max_treedepth = 12,
+                           step_size = 0.2),
+            seed = 543,
+            backend = "cmdstanr", 
+            data = zoop %>% filter(!is.na(Rotif)),
             file = "models/231026_rotif",
             file_refit = "on_change"
 )
@@ -259,27 +336,38 @@ summary(pDayTr, point = "mean")
 
 
 
-# rot2.m = brm(bf(log1p(Rot) ~ 
-#                  + PF_abund
-#                +MF_abund
-#                +HF_abund
-#                + (1|Mes_ID)),
-#             family = gaussian(link = "identity"),
-#             # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
-#             chains = 4,
-#             iter = 2000,
-#             cores = 4,
-#             control = list(adapt_delta = 0.99,
-#                            max_treedepth = 12,
-#                            step_size = 0.2),
-#             seed = 543,
-#             backend = "cmdstanr", 
-#             data = env%>% filter(!is.na(Rot)),
-#             file = "models/231026_rotif",
-#             file_refit = "on_change"
-# )
+zoo.m = brm(bf(log1p(Zoopl) ~
+                 + Treatment*ExpDay
+               + (1|Mes_ID)),
+            family = gaussian(link = "identity"),
+            chains = 4,
+            iter = 2000,
+            cores = 4,
+            control = list(adapt_delta = 0.99,
+                           max_treedepth = 12,
+                           step_size = 0.2),
+            seed = 543,
+            backend = "cmdstanr",
+            data = zoop %>% filter(!is.na(Zoopl)),
+            file = "models/231127_zoopl",
+            file_refit = "on_change"
+)
 
+pp_check(zoo.m, ndraws = 10)
+summary(zoo.m)
+conditional_effects(zoo.m, effects = "Treatment:ExpDay")
+conditional_effects(zoo.m, effects = "ExpDay:Treatment")
 
+emTrDay = emmeans(zoo.m, ~ Treatment|ExpDay)
+summary(emTrDay, point = "mean")
+pTrDay = pairs(emTrDay)
+
+emDayTr = emmeans(zoo.m, ~ ExpDay|Treatment)
+summary(emDayTr, point = "mean")
+pDayTr = pairs(emDayTr)
+
+summary(pTrDay, point = "mean")
+summary(pDayTr, point = "mean")
 
 
 
@@ -534,7 +622,7 @@ mgr.m1 = brm(bf(M.Gr ~
             backend = "cmdstanr", 
             data = dat1,
             file = "models/231025_mGR.m1",
-            file_refit = "on_change"
+            # file_refit = "on_change"
 )
 conditional_effects(mgr.m1, effects = "Treatment:ExpDay")
 conditional_effects(mgr.m1, effects = "ExpDay:Treatment")
@@ -563,7 +651,7 @@ hgr.m1 = brm(bf(H.Gr ~
             backend = "cmdstanr", 
             data = dat1,
             file = "models/231025_hGR.m1",
-            file_refit = "on_change"
+            # file_refit = "on_change"
 )
 pp_check(hgr.m1)
 summary(hgr.m1)
@@ -762,57 +850,115 @@ matheme +
 
 ##----
 
-mod.plot <- function(mod){
-  dat %>% 
-    group_by(Mes_ID,ExpDay, Treatment) %>% 
-    # data_grid(ExpDay = seq_range(ExpDay, n = 101)) %>% 
-    add_epred_draws(mod,
-                    re_formula = NA,
-                    # ndraws = 100
-    ) %>% 
-    ggplot(., aes(x = ExpDay,
-                  y = mod$data[,1],
-                  colour = Treatment,
-                  # fill = Treatment
-    )) +
-    # geom_boxplot(aes(y = (.epred)), width= .7)+
-    # geom_violinhalf(aes(y = (.epred)))+
-    stat_pointinterval(aes(y = (.epred)),
-                       .width = c(0.95),
-                       position = position_dodge(.5),
-                       fatten_point = 3)+
-    geom_point(
-      data = dat,
-      aes(x = ExpDay,
-          y = PF_abund,
-          colour = Treatment),
-      inherit.aes = FALSE,
-      position = position_jitterdodge(dodge.width = .5),
-      alpha = .5) +
-    # scale_x_continuous(breaks = c(1, 2, 3), 
-    #                    labels = c(5, 13, 21)) +
-    scale_color_manual(values = trt.cols)+
-    scale_fill_manual(values = trt.cols)+
-    #                    aesthetics = c("colour")) +
-    # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5","#EBF0F9",  "#FCECEE")) +
-    # theme_modern()
-    theme(panel.grid.minor = element_blank(),
-          panel.grid.major = element_blank(),
-          # panel.background = element_rect(fill = "grey98"),
-          panel.background = element_blank(),
-          axis.line = element_line(colour = "black", linewidth = .3),
-          axis.text = element_text(size = 11, colour = "black"),
-          axis.title = element_text(size = 11),
-          # axis.text.y = element_text(size = 12),
-          strip.text.y = element_text(size = 12)) +
-    labs(y = "Log(x+1) Abundance cells/mL",
-         x = "Experimental day")
-}
+# mod.plot <- function(mod){
+#   dat %>% 
+#     group_by(Mes_ID,ExpDay, Treatment) %>% 
+#     # data_grid(ExpDay = seq_range(ExpDay, n = 101)) %>% 
+#     add_epred_draws(mod,
+#                     re_formula = NA,
+#                     # ndraws = 100
+#     ) %>% 
+#     ggplot(., aes(x = ExpDay,
+#                   y = mod$data[,1],
+#                   colour = Treatment,
+#                   # fill = Treatment
+#     )) +
+#     # geom_boxplot(aes(y = (.epred)), width= .7)+
+#     # geom_violinhalf(aes(y = (.epred)))+
+#     stat_pointinterval(aes(y = (.epred)),
+#                        .width = c(0.95),
+#                        position = position_dodge(.5),
+#                        fatten_point = 3)+
+#     geom_point(
+#       data = dat,
+#       aes(x = ExpDay,
+#           y = PF_abund,
+#           colour = Treatment),
+#       inherit.aes = FALSE,
+#       position = position_jitterdodge(dodge.width = .5),
+#       alpha = .5) +
+#     # scale_x_continuous(breaks = c(1, 2, 3), 
+#     #                    labels = c(5, 13, 21)) +
+#     scale_color_manual(values = trt.cols)+
+#     scale_fill_manual(values = trt.cols)+
+#     #                    aesthetics = c("colour")) +
+#     # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5","#EBF0F9",  "#FCECEE")) +
+#     # theme_modern()
+#     theme(panel.grid.minor = element_blank(),
+#           panel.grid.major = element_blank(),
+#           # panel.background = element_rect(fill = "grey98"),
+#           panel.background = element_blank(),
+#           axis.line = element_line(colour = "black", linewidth = .3),
+#           axis.text = element_text(size = 11, colour = "black"),
+#           axis.title = element_text(size = 11),
+#           # axis.text.y = element_text(size = 12),
+#           strip.text.y = element_text(size = 12)) +
+#     labs(y = "Log(x+1) Abundance cells/mL",
+#          x = "Experimental day")
+# }
+# 
+# 
+# plot_list <- map(bio_lst, mod.plot)
+# 
+# plt_df <- tibble(variable = bio_lst, plots = plot_list)
+
+## backgr====
+
+(par.pl <- env %>% 
+   filter(!is.na(PAR)) %>% droplevels(ExpDay) %>% 
+   group_by(Mes_ID,ExpDay, Treatment) %>% 
+   add_epred_draws(par.m,
+                   re_formula = NA,
+   ) %>% 
+   ggplot(., aes(x = ExpDay,
+                 y = PAR,
+                 colour = Treatment,
+   )) +
+   # geom_vline(aes(xintercept = 1.5), linetype = "dashed", color = "#e84855", alpha = 0.4)+
+   stat_pointinterval(aes(y = (.epred)),
+                      .width = c(0.95),
+                      position = position_dodge(.5),
+                      # fatten_point = 3,
+                      linewidth = 2, 
+                      show.legend = FALSE
+   )+
+   geom_point(
+     data = env,
+     aes(x = ExpDay,
+         y = PAR,
+         colour = Treatment,
+         # shape = Treatment
+     ),
+     inherit.aes = FALSE,
+     position = position_jitterdodge(dodge.width = .5),
+     alpha = .35
+   ) +
+   scale_color_manual(values = trt.cols)+
+   scale_fill_manual(values = trt.cols)+
+   # theme_modern()+
+   theme(
+     # legend.position = "none",
+     legend.title = element_blank(),
+     legend.background	= element_blank(),
+     legend.key	= element_blank(),
+     legend.direction = "horizontal",
+     panel.grid.minor = element_blank(),
+     panel.grid.major = element_blank(),
+     panel.background = element_blank(),
+     axis.line = element_line(colour = "black", linewidth = .3),
+     axis.text = element_text(size = 12, colour = "black"),
+     axis.title = element_text(size = 14),
+     # axis.text.y = element_text(size = 12),
+     # strip.text.y = element_text(size = 12)
+   ) +
+   labs(y = "Log(x+1) cells/mL",
+        x = "Experimental day")+
+   guides(colour = guide_legend(override.aes = list(size=4,
+                                                    color = trt.cols)))
+)
 
 
-plot_list <- map(bio_lst, mod.plot)
 
-plt_df <- tibble(variable = bio_lst, plots = plot_list)
 
 ## abundances-----
 (phot.leg <- dat %>% 
@@ -824,6 +970,7 @@ plt_df <- tibble(variable = bio_lst, plots = plot_list)
                   y = PF_abund,
                   colour = Treatment,
     )) +
+   # geom_vline(aes(xintercept = 1.5), linetype = "dashed", color = "#e84855", alpha = 0.4)+
     stat_pointinterval(aes(y = (.epred)),
                        .width = c(0.95),
                        position = position_dodge(.5),
@@ -840,7 +987,7 @@ plt_df <- tibble(variable = bio_lst, plots = plot_list)
           ),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
-      alpha = .5
+      alpha = .35
       ) +
     scale_color_manual(values = trt.cols)+
     scale_fill_manual(values = trt.cols)+
@@ -868,7 +1015,7 @@ plt_df <- tibble(variable = bio_lst, plots = plot_list)
 
 leg <- get_legend(phot.leg)
 # ggsave("Plots/legend2.png", leg, dpi = 300)
-phot <- phot.leg + theme(legend.position = "none",)
+phot <- phot.leg + theme(legend.position = "none")
 
 (het <- dat %>% 
     group_by(Mes_ID,ExpDay, Treatment) %>% 
@@ -892,48 +1039,7 @@ phot <- phot.leg + theme(legend.position = "none",)
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
-      alpha = .5) +
-    scale_color_manual(values = trt.cols)+
-    scale_fill_manual(values = trt.cols)+
-    # theme_modern()+
-    theme(
-      legend.position = "none",
-      panel.grid.minor = element_blank(),
-      panel.grid.major = element_blank(),
-      panel.background = element_blank(),
-      axis.line = element_line(colour = "black", linewidth = .3),
-      axis.text = element_text(size = 12, colour = "black"),
-      axis.title = element_text(size = 14),
-      # axis.text.y = element_text(size = 12),
-      # strip.text.y = element_text(size = 12)
-    ) +
-    labs(y = NULL,
-         x = "Experimental day")
-)
-
-(mix <- dat %>% 
-    group_by(Mes_ID,ExpDay, Treatment) %>% 
-    add_epred_draws(m.m,
-                    re_formula = NA,
-    ) %>% 
-    ggplot(., aes(x = ExpDay,
-                  y = MF_abund,
-                  colour = Treatment,
-    )) +
-    stat_pointinterval(aes(y = (.epred)),
-                       .width = c(0.95),
-                       position = position_dodge(.5),
-                       # fatten_point = 3,
-                       linewidth = 2
-    )+
-    geom_point(
-      data = dat,
-      aes(x = ExpDay,
-          y = MF_abund,
-          colour = Treatment),
-      inherit.aes = FALSE,
-      position = position_jitterdodge(dodge.width = .5),
-      alpha = .5) +
+      alpha = .35) +
     scale_color_manual(values = trt.cols)+
     scale_fill_manual(values = trt.cols)+
     # theme_modern()+
@@ -953,8 +1059,56 @@ phot <- phot.leg + theme(legend.position = "none",)
 )
 
 
-p1 <- ggarrange(phot, mix, het, ncol = 3, common.legend = T, legend.grob = leg, legend = "bottom")+ bgcolor("white") 
-ggsave("Plots/abund_20231029.tiff", p1, dpi=300) 
+(mix1 <- dat1 %>% 
+  group_by(Mes_ID,ExpDay, Treatment) %>% 
+  add_epred_draws(m.m1,
+                  re_formula = NA,
+  ) %>% 
+  ggplot(., aes(x = ExpDay,
+                y = MF_abund,
+                colour = Treatment,
+  )) +
+  stat_pointinterval(aes(y = (.epred)),
+                     .width = c(0.95),
+                     position = position_dodge(.5),
+                     # fatten_point = 3,
+                     linewidth = 2
+  )+
+  geom_point(
+    data = dat1,
+    aes(x = ExpDay,
+        y = MF_abund,
+        colour = Treatment),
+    inherit.aes = FALSE,
+    position = position_jitterdodge(dodge.width = .5),
+    alpha = .35) +
+  scale_color_manual(values = trt.cols)+
+  scale_x_discrete(breaks = c("5", "13", "21"),
+                   limits = c("5", "13", "21"))+
+  # theme_modern()+
+  theme(
+    legend.position = "none",
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.background = element_blank(),
+    axis.line = element_line(colour = "black", linewidth = .3),
+    axis.text = element_text(size = 12, colour = "black"),
+    axis.title = element_text(size = 14),
+    # axis.text.y = element_text(size = 12),
+    # strip.text.y = element_text(size = 12)
+  ) +
+  labs(y = NULL,
+       x = "Experimental day")
+)
+
+
+
+
+p1 <- ggarrange(phot, mix1, het, ncol = 3
+                # ,common.legend = T, legend.grob = leg, legend = "bottom"
+                )+ bgcolor("white") 
+
+ggsave("Plots/Nov2023/abund_20231103.tiff", p1, dpi=300) 
 
 
 
@@ -981,9 +1135,8 @@ ggsave("Plots/abund_20231029.tiff", p1, dpi=300)
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
-      alpha = .5) +
+      alpha = .35) +
     scale_color_manual(values = trt.cols)+
-    scale_fill_manual(values = trt.cols)+
     # theme_modern()+
     theme(
       legend.position = "none",
@@ -1021,9 +1174,9 @@ ggsave("Plots/abund_20231029.tiff", p1, dpi=300)
             colour = Treatment),
         inherit.aes = FALSE,
         position = position_jitterdodge(dodge.width = .5),
-        alpha = .5) +
+        alpha = .4) +
       scale_color_manual(values = trt.cols)+
-      scale_fill_manual(values = trt.cols)+
+
       # theme_modern()+
       theme(
         legend.position = "none",
@@ -1041,7 +1194,7 @@ ggsave("Plots/abund_20231029.tiff", p1, dpi=300)
 )
 
 p2 <- ggarrange(bact, cyan, align = "h") + bgcolor("white")
-ggsave("Plots/bact_20231030.tiff", p2, dpi=300)
+ggsave("Plots/Nov2023/bact_20231030.tiff", p2, dpi=300)
 
 
 
@@ -1258,7 +1411,7 @@ agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in",
          colour = Treatment),
      inherit.aes = FALSE,
      position = position_jitterdodge(dodge.width = .5),
-     alpha = .5) +
+     alpha = .4) +
    scale_color_manual(values = trt.cols)+
    scale_fill_manual(values = trt.cols)+
    # theme_modern()+
@@ -1273,7 +1426,7 @@ agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in",
      # axis.text.y = element_text(size = 12),
      # strip.text.y = element_text(size = 12)
    ) +
-   labs(y = "Biovolume (\u00b5m\u00b3 mL\u207b\u00b9)",
+   labs(y = "Biovolume log(x+1) \u00b5m\u00b3 mL\u207b\u00b9",
         x = "Experimental day")
  )
 
@@ -1300,7 +1453,7 @@ agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in",
          colour = Treatment),
      inherit.aes = FALSE,
      position = position_jitterdodge(dodge.width = .5),
-     alpha = .5) +
+     alpha = .4) +
    scale_color_manual(values = trt.cols)+
    scale_fill_manual(values = trt.cols)+
    # theme_modern()+
@@ -1319,7 +1472,7 @@ agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in",
         x = "Experimental day")
 )
 
-(mix.vol <- dat %>% 
+(mix.vol1 <- dat1 %>% 
    group_by(Mes_ID,ExpDay, Treatment) %>% 
    add_epred_draws(ms.m,
                    re_formula = NA,
@@ -1335,15 +1488,16 @@ agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in",
                       linewidth = 2
    )+
    geom_point(
-     data = dat,
+     data = dat1,
      aes(x = ExpDay,
          y = biovol_MF,
          colour = Treatment),
      inherit.aes = FALSE,
      position = position_jitterdodge(dodge.width = .5),
-     alpha = .5) +
+     alpha = .4) +
    scale_color_manual(values = trt.cols)+
-   scale_fill_manual(values = trt.cols)+
+   scale_x_discrete(breaks = c("5", "13", "21"),
+                    limits = c("5", "13", "21"))+
    # theme_modern()+
    theme(
      legend.position = "none",
@@ -1360,8 +1514,8 @@ agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in",
         x = "Experimental day")
 )
 
-p4 <- ggarrange(phot.vol, mix.vol, het.vol, nrow = 1, align = "h")
-p4.1 <- ggarrange(phot.vol, mix.vol1, het.vol, nrow = 1, align = "h")
+p4 <- ggarrange(phot.vol, mix.vol1, het.vol, nrow = 1, align = "h")
 
-ggsave("Plots/20231102_biovolumes.tiff", p4, dpi = 300)
-ggsave("Plots/20231102_biovolumes1.tiff", p4.1, dpi = 300)
+ggsave("Plots/Nov2023/20231103_biovolumes.tiff", p4, dpi = 300)
+
+
