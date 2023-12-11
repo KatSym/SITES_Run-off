@@ -179,6 +179,7 @@ env <- full_join(Dnut, TP_Chla, by = c("MesID", "ExpDay")) %>%
 
 ### Create a data file with all data -----------------
 
+# from data_wrangling 
 data = dat %>% 
   mutate(ExpDay = case_when(Incubation == 1 ~ 5,
                             Incubation == 2 ~ 13,
@@ -221,6 +222,15 @@ save(data, envir, trt.cols, file = "all_data.RData")
 
 # plots ---------
 
+nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
+  # filter(complete.cases(.)) %>%
+  mutate(Treatment = case_when(MesID == 1 | MesID == 7 | MesID == 10 | MesID == 16 ~ "C",
+                               MesID == 2 | MesID == 8 | MesID == 11 | MesID == 13 ~ "D",
+                               MesID == 3 | MesID == 5 | MesID == 12 | MesID == 14 ~ "I",
+                               MesID == 4 | MesID == 6 | MesID == 9 | MesID == 15 ~ "E"),
+         # ExDay =case_when(Day == 1 ~ 4,)
+         ) %>% 
+  filter(ExpDay !=36)
 
 (a420 <- absorbance %>%
   filter(ExpDay<21) %>% 
@@ -263,54 +273,56 @@ save(data, envir, trt.cols, file = "all_data.RData")
   labs(x = NULL,
        y = bquote("a"[420]~"(m\u207b\u00b9)")))
 
-# Treats %>%
-#   ggplot(., aes(x = Experimental_day, y = intensity, fill = Treatment))+
-#   geom_bar(stat = "identity", position=position_dodge(), width = .6,
-#            # alpha = .3
-#            ) +
-#   scale_fill_manual(values = trt.cols,
-#                     labels = c("Daily", "Intermediate", "Extreme")) +
-#   scale_x_continuous(limits = c(0, 21),
-#                      expand = c(0, 0),
-#                      breaks = c(0, 5, 10, 13, 20, 21)) +
-#   labs(y = "Addition %",
-#        x = "Experimental day") +
-# theme(panel.grid.minor = element_blank(),
-#       panel.grid.major = element_blank(),
-#       panel.background = element_rect(fill='transparent'),
-#       plot.background = element_rect(fill='transparent', color=NA),
-#       axis.text = element_text(size = 11, , colour = "black"),
-#       axis.title = element_text(size = 11),
-#       legend.position = "bottom",
-#       legend.title = element_blank(),
-#       legend.background = element_rect(fill='transparent'),
-#       # axis.text.y = element_text(size = 12),
-#       strip.text.y = element_text(size = 12),
-#       axis.text.x = element_text(colour = c('black', 'darkred','black', 'darkred','black', 'darkred' ),
-#                                  face = c("plain", "bold", "plain", "bold", "plain", "bold")))
-# ggsave("Plots/20230526_treatments.png", dpi = 300)
+treatm <- Treats %>%
+  ggplot(., aes(x = Experimental_day, y = intensity, fill = Treatment))+
+  geom_bar(stat = "identity", position=position_dodge(), width = .6,
+           # alpha = .3
+           ) +
+  scale_fill_manual(values = trt.cols,
+                    labels = c("Daily", "Intermediate", "Extreme")) +
+  scale_x_continuous(limits = c(0, 22),
+                     expand = c(0, 0),
+                     breaks = c(0, 5, 10, 15, 20, 22),
+                     label = c(0, 5, 10, 15, 20, "")) +  
+  scale_y_continuous(expand = c(0, 0),
+                     limits = c(0, 110)) +
+  geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+  geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+  geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
+    labs(y = "Addition %",
+       x = NULL) +
+  matheme+
+theme(
+  # panel.background = element_rect(fill='transparent'),
+  #     plot.background = element_rect(fill='transparent', color=NA),
+      # axis.text = element_text(size = 11, colour = "black"),
+      axis.title = element_text(size = 13),
+      legend.position = "none",
+      legend.title = element_blank(),
+      # legend.background = element_rect(fill='transparent'),
+      # axis.text.y = element_text(size = 12),
+      # strip.text.y = element_text(size = 12),
+      # axis.text.x = element_text(colour = c('black', 'darkred','black', 'darkred','black', 'darkred' ),
+      #                            face = c("plain", "bold", "plain", "bold", "plain", "bold"))
+      )
+ggsave("Plots/20231102_treatments.png", dpi = 300)
 
 
-TP_Chla %>%
-  mutate(Treatment = case_when(MesID == 1 | MesID == 7 | MesID == 10 | MesID == 16 ~ "C",
-                               MesID == 2 | MesID == 8 | MesID == 11 | MesID == 13 ~ "D",
-                               MesID == 3 | MesID == 5 | MesID == 12 | MesID == 14 ~ "I",
-                               MesID == 4 | MesID == 6 | MesID == 9 | MesID == 15 ~ "E")) %>%
-  drop_na() %>% 
-  filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
-  ggplot(., aes(x = as.factor(ExpDay), y = Chla, fill = Treatment)) +
-  # geom_smooth(aes(group = Treatment, colour = Treatment, fill = Treatment)) +
-  geom_boxplot(position = "dodge2")+
-  # geom_point(
-  #   aes(x = Date,
-  #       y = Chla,
-  #       colour = Treatment),
-  #   position = position_jitter(width = .02),
-  #   alpha = .5) +
-  # scale_x_continuous(
-  #   breaks = c("2022-07-07", "2022-07-11", "2022-07-15", "2022-07-19", ),
-  #                    labels = c(0, 4, 8, 12, 20, 36)
-  # ) +
+nuts %>%
+  group_by(ExpDay, Treatment) %>% 
+  summarise(
+    sd = sd(Chla),
+    chla = mean(Chla)
+  ) %>% 
+  ggplot(., aes(x = ExpDay, y = chla, color = Treatment)) +
+  geom_vline(aes(xintercept =7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
+  geom_errorbar(
+    aes(ymin = chla-sd, ymax = chla+sd, color = Treatment),
+    position = position_dodge(0.3), width = 0.2
+  )+
+  geom_point(aes(color = Treatment), position = position_dodge(0.3)) +
+  geom_line(aes(group = Treatment))+
+  scale_color_manual(values = trt.cols)+
   scale_fill_manual(values = trt.cols)+
   # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
   theme(panel.grid.minor = element_blank(),
@@ -322,24 +334,37 @@ TP_Chla %>%
         axis.title = element_text(size = 11),
         strip.text.y = element_text(size = 12)) +
   labs(x = "Experimental day",
-       y = "Chla mg L\u207b\u2081")
+       y = "Chla mg L\u207b\u00b9")
 
-# nutrient plot - comment the filter on the dataframes
-nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
-  # filter(complete.cases(.)) %>%
-  mutate(Treatment = case_when(MesID == 1 | MesID == 7 | MesID == 10 | MesID == 16 ~ "C",
-                               MesID == 2 | MesID == 8 | MesID == 11 | MesID == 13 ~ "D",
-                               MesID == 3 | MesID == 5 | MesID == 12 | MesID == 14 ~ "I",
-                               MesID == 4 | MesID == 6 | MesID == 9 | MesID == 15 ~ "E"),
-         # ExDay =case_when(Day == 1 ~ 4,)
-         ) %>% 
-  filter(ExpDay !=36)
-%>%
-  pivot_longer(cols = c("DOC", "DN", "TP"), names_to = "varbl", values_to = "val")
-# %>%
-#   mutate(val = log1p(val)) %>%
-#   group_by(Day, Treatment, MesID, varbl) %>%
-#   summarise_all(mean)
+env %>%
+  filter(ExpDay<21) %>%
+  # mutate(r = log1p(Rot)) %>%
+  group_by(ExpDay, Treatment) %>% 
+  summarise(
+    sd = sd(Rot),
+    rot = mean(Rot)
+  ) %>% 
+  ungroup() %>%
+  drop_na() %>% 
+  ggplot(., aes(x = ExpDay, y = rot, color = Treatment, group = Treatment)) +
+  geom_vline(aes(xintercept =7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
+  geom_line(aes(group = Treatment))+
+  geom_errorbar(
+    aes(ymin = rot-sd, ymax = rot+sd, color = Treatment),
+    position = position_dodge(0.3), width = 0.2
+  )+
+  geom_point(aes(color = Treatment), position = position_dodge(0.3)) +
+  scale_color_manual(values = trt.cols)+
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
+        axis.title = element_text(size = 11),
+        strip.text.y = element_text(size = 12)) +
+  labs(x = "Experimental day",
+       y = "Rotifers L\u207b\u2081")
 
 
 (tp <- nuts %>%
@@ -415,16 +440,20 @@ nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
   labs(x = "Experimental day",
        y = "Total nitrogen (mg L\u207b\u00b9)"))
 
-doc <- nuts %>%
-  # filter(ExpDay %in% c(0, 4, 12, 20, 36)) %>% 
-  ggplot(., aes(x = ExpDay, y = DOC, color = Treatment)) +
-  stat_smooth(aes(group = Treatment, colour = Treatment), 
-              method = NULL,
-              se =F) +
-  geom_point(
-    aes(x = ExpDay,
-        y = DOC,
-        colour = Treatment))+
+nuts %>%
+  group_by(ExpDay, Treatment) %>% 
+  summarise(
+    sd = sd(DOC),
+    doc = mean(DOC)
+  ) %>% 
+  ggplot(., aes(x = ExpDay, y = doc, color = Treatment)) +
+  geom_vline(aes(xintercept =7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
+  geom_errorbar(
+    aes(ymin = doc-sd, ymax = doc+sd, color = Treatment),
+    position = position_dodge(0.3), width = 0.2
+  )+
+  geom_point(aes(color = Treatment), position = position_dodge(0.3)) +
+  geom_line(aes(group = Treatment))+
   scale_color_manual(values = trt.cols)+
   # scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#FCECEE","#EBF0F9")) +
   theme(panel.grid.minor = element_blank(),
@@ -435,16 +464,16 @@ doc <- nuts %>%
         axis.text = element_text(size = 10, colour = "black"),
         axis.title = element_text(size = 12)) +
   labs(x = "Experimental day",
-       y = "Total nitrogen mg L\u207b\u00b9")
+       y = "DOC mg L\u207b\u00b9")
 
 
 
-# ggsave("Plots/20230531_nutrients.png", dpi = 300)
+ggsave("Plots/Nov2023/20231104_rot2.tiff", dpi = 300)
 
 
 
 (par <- env %>% 
-  filter(ExpDay > 0 & ExpDay < 21  & PAR < 125) %>%
+  filter(ExpDay > 0 & ExpDay < 22  & PAR < 125) %>%
     group_by(ExpDay, Treatment) %>% 
     summarise(
       sd = sd(PAR),
