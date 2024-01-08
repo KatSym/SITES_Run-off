@@ -9,7 +9,8 @@ rotifers <- read_xlsx("Data/rotifers_volvoxes.xlsx",
          Treatment = treatment,
          vol = `sample volume (ml)`) %>% 
   filter(mesocosm!="LE",
-         ExpDay<21) %>% 
+         # ExpDay<21
+         ) %>% 
   mutate(
     # taking rotifer colonies as 1 individual, per L
     Rotif = 1000*(`small rotifers`+ asplanchna + kellicottia + `rotifer colony`)/vol,
@@ -50,11 +51,31 @@ zoopl <- read_xlsx("Data/ZOOPLANKTON_FINAL.xlsx",
     # per L
     abund = 1000*(((Counted * Concentrated_Volume_ml)/Counted_Volume_ml) + Picked) / Volume_ml
   ) %>% 
-  select(Mes_ID,Treatment, ExpDay, Sample, Group, Species, abund)
+  select(ExpDay, Treatment, Mes_ID,Sample, Group, Species, abund) %>% 
+  arrange(ExpDay, Treatment, Mes_ID)
 
 ggplot(zoopl, aes(x = as.factor(ExpDay), y = abund, fill = Group))+
   geom_bar(width = 0.8, stat = "identity", position = "dodge")+
   facet_wrap(~Treatment)
+
+
+
+
+#checking large rotifers
+asp = rotifers %>% filter(rotif.sp=="Aspl") %>% rename(ben = abund) %>%
+  group_by(ExpDay,Treatment, Mes_ID) %>% 
+  summarise_all(mean) 
+lrot = zoopl %>% filter(Species=="L_rotifer") %>% rename(benny = abund)
+Lr = full_join(asp, lrot, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
+  select(ExpDay,Treatment, Mes_ID, ben, benny) %>% 
+  pivot_longer(cols = c(ben, benny), 
+               names_to = "who", values_to = "abund") %>% 
+  ungroup()
+
+ggplot(Lr, aes(x = as.factor(ExpDay), y = abund, fill = who))+
+  geom_bar(width = 0.8, stat = "identity", position = "dodge")+
+  facet_wrap(~Treatment)
+
 
 ## combination to do other stuff
 rot1 <- rotifers %>% 
@@ -74,3 +95,30 @@ zoop1 <- zoopl %>%
 zoop <- full_join(rot1, zoop1, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
   filter(Mes_ID %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16)) %>% 
   ungroup() 
+
+
+meas <- read_xlsx("Data/Erken_zoo_measurements_2016-2019.xlsx", 
+                  sheet = 1, range = "A1:O2023", col_names = T) %>% 
+  select(-c(Site, Comment1, `Dyntaxa ID`, `Analysis method`, `Analysis laboratory`)) %>% 
+  mutate(month = substr(as.character(Date), 3, 4)) %>% 
+  filter(month %in% c("06", "07", "08")) %>% 
+  # keeping only the genus
+  separate(ScientificName, c("Genus", NA), remove = T)
+
+meas %>% filter(Genus == "Kellicottia") %>% 
+ggplot(., aes(x = `Biovol.(µm³/l)`)) +
+  geom_histogram()
+
+
+
+
+rot.meas <- meas %>% filter(Phylum == "Rotifera") %>% 
+  group_by(Genus) %>% 
+  summarise(biovol.m = mean(`Biovol.(µm³/l)`),
+            biovol.sd = sd(`Biovol.(µm³/l)`),
+            length.m = mean(`Mesured length (µm)`),
+            length.sd = sd(`Mesured length (µm)`),
+            FW.m = mean(`Freshweight(mg/l)`),
+            FW.sd = sd(`Freshweight(mg/l)`))
+
+small.len = rnorm(150, 113.7639, 18.965807)
