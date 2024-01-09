@@ -110,7 +110,7 @@ ingest <- read_xlsx("Data/SITES_microscope_data_working.xlsx",
   pivot_wider(names_from = c(Time_point, Grazer), 
               values_from = c(cells_feeding, flb_ingest
               )) 
-ingest$Mes_ID <- as.factor(ING$Mes_ID)
+ingest$Mes_ID <- as.factor(ingest$Mes_ID)
 
 # correct ingestion rates
 # subtract number of cells with FLB and number of FLB
@@ -144,15 +144,15 @@ dat <- partial_dat %>%
 
 dat$aMFc[dat$aMFc<0] <- 0
 
-# bdat <- dat %>% 
-#   select(Incubation, Treatment, Mes_ID, Replicate, aHF, aMFc, aPF) %>% 
-#   pivot_longer(cols = c(aHF, aPF, aMFc), names_to = "agroup", values_to = "abundance") %>% 
-#   mutate(GROUP = substring(agroup, 2, 3))  %>% 
-#   inner_join(., sz.data, by = c("Incubation", "Treatment", "GROUP")) %>% 
-#   mutate(biovol = abundance *mean.cell.vol,
-#     biomass = abundance * (0.216*mean.cell.vol^0.939)) %>%  # Menden-Deuer Lessard 2000, pgC/mL
-#   select(Incubation, Treatment, Mes_ID, Replicate, GROUP, biomass, biovol) %>% 
-#   pivot_wider(names_from = GROUP, values_from =c(biomass, biovol), values_fn = mean)
+bdat <- dat %>%
+  select(Incubation, Treatment, Mes_ID, Replicate, aHF, aMFc, aPF) %>%
+  pivot_longer(cols = c(aHF, aPF, aMFc), names_to = "agroup", values_to = "abundance") %>%
+  mutate(GROUP = substring(agroup, 2, 3))  %>%
+  inner_join(., sz.data, by = c("Incubation", "Treatment", "GROUP")) %>%
+  mutate(biovol = abundance *mean.cell.vol,
+    biomass = abundance * (0.216*mean.cell.vol^0.939)) %>%  # Menden-Deuer Lessard 2000, pgC/mL
+  select(Incubation, Treatment, Mes_ID, Replicate, GROUP, biomass, biovol) %>%
+  pivot_wider(names_from = GROUP, values_from =c(biomass, biovol), values_fn = mean)
 
 
 ### BACTERIA ----
@@ -404,3 +404,5 @@ data = dat %>%
 
 # save the above data frame and the colours so you don't have to run all this every time
 save(data, envir, rot, trt.cols, file = "all_data.RData")
+
+# write csvs
