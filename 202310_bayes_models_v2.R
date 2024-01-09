@@ -5,9 +5,9 @@ library(tidybayes)
 library(modelr)
 library(emmeans)
 library(loo)
-library(easystats)
 library(rempsyc)
 library(ggpubr)
+library(grid)
 
 
 # all models in Bayes
@@ -15,8 +15,11 @@ library(ggpubr)
 # data
 load("all_data.RData")
 
-mysc <- function(x){
-  (x-mean(x))/sd(x)
+# mysc <- function(x){
+#   (x-mean(x))/sd(x)
+# }
+mytr <- function(x){
+  log10(x+1)
 }
 # 
 # trt.cols2 <-  c(`C`= "#1a1a1a", #black - C
@@ -26,20 +29,20 @@ mysc <- function(x){
 # all days 
 # no transformation
 env <- envir %>% 
-  select(-c(TOC, DN, Chla, DOsat, DOconc)) %>% 
+  select(-c(TOC, DN, DOsat, DOconc)) %>% 
   relocate(c(ExpDay, Treatment), .before = Mes_ID) %>% 
   mutate(Nutr = TN*1000 + TP,
          # across(DOC:Nutr, scale),
-         # scale all predisctors
+         # scale all predictors
          # across(DOC:Nutr, mysc),
                 # ~(.-mean(.)) / sd(.)
                 ExpDay = factor(ExpDay)
          )
   
 dat <- data %>% 
-  # log(x + 1) transormed
   relocate(c(M.Ir, H.Ir, M.Gr, H.Gr), .after = biovol_MF) %>% 
-    mutate(across(4:16, log1p),
+  # log(x + 1) transormed
+    mutate(across(4:16, mytr),
            ExpDay = factor(ExpDay
                            # , levels = c("5", "13", "21")
            )
@@ -193,6 +196,41 @@ summary(pTrDay, point = "mean")
 emDayTr = emmeans(doc.m, ~ ExpDay|Treatment)
 summary(emDayTr, point = "mean")
 pDayTr = pairs(emDayTr)
+summary(pDayTr, point = "mean")
+
+
+chla.m <- brm(bf(Chla ~ 
+                   + Treatment*ExpDay
+                 + (1|Mes_ID)),
+              family = gaussian(link = "identity"),
+              # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
+              chains = 4,
+              iter = 2000,
+              cores = 4,
+              control = list(adapt_delta = 0.99,
+                             max_treedepth = 12,
+                             step_size = 0.2),
+              seed = 543,
+              backend = "cmdstanr", 
+              data = env %>% filter(!is.na(Chla)),
+              file = "models/231204_chla",
+              # file = "models/231212_chla",
+              file_refit = "on_change"
+)
+pp_check(chla.m)
+summary(chla.m)
+conditional_effects(chla.m, effects = "Treatment:ExpDay")
+conditional_effects(chla.m, effects = "ExpDay:Treatment")
+
+emTrDay = emmeans(chla.m, ~ Treatment|ExpDay)
+summary(emTrDay, point = "mean")
+pTrDay = pairs(emTrDay)
+
+emDayTr = emmeans(chla.m, ~ ExpDay|Treatment)
+summary(emDayTr, point = "mean")
+pDayTr = pairs(emDayTr)
+
+summary(pTrDay, point = "mean")
 summary(pDayTr, point = "mean")
 
 
@@ -350,7 +388,7 @@ zoo.m = brm(bf(log1p(Zoopl) ~
             backend = "cmdstanr",
             data = zoop %>% filter(!is.na(Zoopl)),
             file = "models/231127_zoopl",
-            file_refit = "on_change"
+            # file_refit = "on_change"
 )
 
 pp_check(zoo.m, ndraws = 10)
@@ -358,7 +396,7 @@ summary(zoo.m)
 conditional_effects(zoo.m, effects = "Treatment:ExpDay")
 conditional_effects(zoo.m, effects = "ExpDay:Treatment")
 
-emTrDay = emmeans(zoo.m, ~ Treatment|ExpDay)
+emTrDay = emmeans(zoo.m, ~ Treatment|ExpDay, type = 'response')
 summary(emTrDay, point = "mean")
 pTrDay = pairs(emTrDay)
 
@@ -369,7 +407,7 @@ pDayTr = pairs(emDayTr)
 summary(pTrDay, point = "mean")
 summary(pDayTr, point = "mean")
 
-
+# emmeans(zoo.m, pairwise ~ ~ Treatment|ExpDay, regrid = "log", type = 'response')
 
 
 
@@ -384,7 +422,7 @@ bact.m = brm(bf(HB_abund ~
           seed = 543,
           backend = "cmdstanr", 
           data = dat,
-          file = "models/231014_bacy.m"
+          file = "models/231210_bacy.m"
 )
 pp_check(bact.m)
 summary(bact.m)
@@ -412,7 +450,7 @@ cy.m = brm(bf(CY_abund ~
           seed = 543,
           backend = "cmdstanr", 
           data = dat,
-          file = "models/231030_cy.m"
+          file = "models/231210_cy.m"
 )
 pp_check(cy.m)
 summary(cy.m)
@@ -442,7 +480,7 @@ p.m = brm(bf(PF_abund ~
            seed = 543,
            backend = "cmdstanr", 
            data = dat,
-           file = "models/231014_phot.m"
+           file = "models/231210_phot.m"
 )
 pp_check(p.m)
 summary(p.m)
@@ -471,7 +509,7 @@ h.m = brm(bf(HF_abund ~
            seed = 543,
            backend = "cmdstanr", 
            data = dat,
-           file = "models/231014_het.m"
+           file = "models/231210_het.m"
 )
 pp_check(h.m)
 summary(h.m)
@@ -489,21 +527,6 @@ pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
 
-m.m = brm(bf(MF_abund ~ 
-               + Treatment*ExpDay
-             + (ExpDay|Mes_ID)),
-          # family = gaussian(link = "identity"),
-          family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
-          chains = 4,
-          iter = 2000,
-          cores = 4,
-          control = list(adapt_delta = 0.99),
-          seed = 543,
-          backend = "cmdstanr", 
-          data = dat,
-          file = "models/231014_mix.m"
-)
-
 m.m1 = brm(bf(MF_abund ~ 
                + Treatment*ExpDay
              + (ExpDay|Mes_ID)),
@@ -516,7 +539,7 @@ m.m1 = brm(bf(MF_abund ~
           seed = 543,
           backend = "cmdstanr", 
           data = dat1,
-          file = "models/231014_mix1.m"
+          file = "models/231210_mix1.m"
 )
 
 
@@ -682,7 +705,7 @@ ps.m = brm(bf(biovol_PF ~
           seed = 543,
           backend = "cmdstanr", 
           data = dat,
-          file = "models/231102_phot-biovol.m"
+          file = "models/231211_phot-biovol.m"
 )
 pp_check(ps.m)
 summary(ps.m)
@@ -711,7 +734,7 @@ hs.m = brm(bf(biovol_HF ~
           seed = 543,
           backend = "cmdstanr", 
           data = dat,
-          file = "models/231102_het-biovol.m"
+          file = "models/231211_het-biovol.m"
 )
 pp_check(hs.m)
 summary(hs.m)
@@ -728,33 +751,6 @@ summary(dddd1, point = "mean")
 pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
-ms.m = brm(bf(biovol_MF ~ 
-               + Treatment*ExpDay
-             + (ExpDay|Mes_ID)),
-          family = gaussian(link = "identity"),
-          chains = 4,
-          iter = 2000,
-          cores = 4,
-          control = list(adapt_delta = 0.99),
-          seed = 543,
-          backend = "cmdstanr", 
-          data = dat,
-          file = "models/231102_mix-biovol.m"
-)
-pp_check(ms.m)
-summary(ms.m)
-conditional_effects(ms.m, effects = "Treatment:ExpDay")
-conditional_effects(ms.m, effects = "ExpDay:Treatment")
-
-dddd = emmeans(ms.m, ~ Treatment|ExpDay)
-summary(dddd, point = "mean")
-pppp = pairs(dddd)
-summary(pppp, point = "mean")
-
-dddd1 = emmeans(ms.m, ~ ExpDay|Treatment)
-summary(dddd1, point = "mean")
-pppp1 = pairs(dddd1)
-summary(pppp1, point = "mean")
 
 
 ms.m1 = brm(bf(biovol_MF ~ 
@@ -768,7 +764,7 @@ ms.m1 = brm(bf(biovol_MF ~
           seed = 543,
           backend = "cmdstanr", 
           data = dat1,
-          file = "models/231102_mix1-biovol.m"
+          file = "models/231211_mix1-biovol.m"
 )
 pp_check(ms.m1)
 summary(ms.m1)
@@ -800,6 +796,34 @@ matheme <- theme(
   # axis.text.y = element_text(size = 12),
   # strip.text.y = element_text(size = 12)
 ) 
+
+leg.v <- ggplot(dat, aes(x = ExpDay, y = PF_abund, color = Treatment))+
+  geom_point()+
+  lims(y = c(0,0))+
+  scale_color_manual(values = trt.cols)+
+  theme_void()+
+  theme(legend.position = c(0.5,0.5),
+        legend.text = element_text(size =  11),
+        legend.background	= element_blank(),
+        legend.key	= element_blank(),
+        legend.title = element_blank()
+        )+
+  guides(colour = guide_legend(override.aes = list(size=4))) # or 4
+
+leg.h <- ggplot(dat, aes(x = ExpDay, y = PF_abund, color = Treatment))+
+  geom_point()+
+  lims(y = c(0,0))+
+  scale_color_manual(values = trt.cols)+
+  theme_void()+
+  theme(legend.position = c(0.5,0.5),
+        legend.text = element_text(size =  11),
+        legend.direction = "horizontal",
+        legend.background	= element_blank(),
+        legend.key	= element_blank(),
+        legend.title = element_blank()
+  )+
+  guides(colour = guide_legend(override.aes = list(size=4))) # or 4
+#--
 
 ### facet plot------
 bio_lst = list(p.m, h.m, m.m)
@@ -904,8 +928,14 @@ matheme +
 
 ## backgr====
 
-(par.pl <- env %>% 
-   filter(!is.na(PAR)) %>% droplevels(ExpDay) %>% 
+nutr = envir %>% 
+  select(-c(TOC, DN, DOsat, DOconc)) %>% 
+  relocate(c(ExpDay, Treatment), .before = Mes_ID)
+
+
+par.pl <- nutr %>% 
+    filter(!is.na(PAR),
+           ExpDay != 0) %>% 
    group_by(Mes_ID,ExpDay, Treatment) %>% 
    add_epred_draws(par.m,
                    re_formula = NA,
@@ -914,18 +944,214 @@ matheme +
                  y = PAR,
                  colour = Treatment,
    )) +
-   # geom_vline(aes(xintercept = 1.5), linetype = "dashed", color = "#e84855", alpha = 0.4)+
+   # geom_vline(aes(xintercept = 7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
+     stat_lineribbon(aes(y = (.epred)),
+                    .width = 0,
+                    # point_interval = "mean_hdi",
+                    position = position_dodge(.5),
+                    size = .8
+    )+
+   stat_pointinterval(aes(y = (.epred)),
+                      .width = c(0.95),
+   # position = position_dodge(.5),
+   fatten_point = 1.5,
+                      linewidth = 1.5,
+                      show.legend = FALSE
+   )+
+   scale_color_manual(values = trt.cols)+
+    matheme+
+   theme(
+     axis.title.y = ggtext::element_markdown(),
+   ) +
+    labs(y = "<span style='font-size: 13pt'>PAR</span>
+         <span style='font-size: 11pt'>(μmol m\u207b\u00b2 s\u207b\u00b9)</span>",
+        x = "Experimental day")
+
+
+
+(abs.pl <- nutr %>% 
+    filter(!is.na(a420)) %>% 
+    group_by(Mes_ID,ExpDay, Treatment) %>% 
+    add_epred_draws(abs.m,
+                    re_formula = NA,
+    ) %>% 
+    ggplot(., aes(x = ExpDay,
+                  y = a420,
+                  colour = Treatment,
+    )) +
+    # geom_vline(aes(xintercept = 7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+    # geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
+    stat_lineribbon(aes(y = (.epred)),
+                    .width = 0,
+                    # point_interval = "mean_hdi",
+                    position = position_dodge(.5),
+                    size = .8
+    )+
+    stat_pointinterval(aes(y = (.epred)),
+                       .width = c(0.95),
+                       # position = position_dodge(.5),
+                       linewidth = 2,
+                       show.legend = FALSE
+    )+
+    scale_color_manual(values = trt.cols)+
+    matheme+
+    theme(
+      axis.title.y = ggtext::element_markdown(),
+    ) +
+    labs(y = "<span style='font-size: 13pt'>Abs<sub>420</sub></span>
+         <span style='font-size: 11pt'>(m\u207b\u00b9)</span>",
+         x = "Experimental day")
+)
+
+
+(tn.pl <- nutr %>% 
+    filter(!is.na(TN)) %>% 
+    group_by(Mes_ID,ExpDay, Treatment) %>% 
+    add_epred_draws(tn.m,
+                    re_formula = NA,
+    ) %>% 
+    ggplot(., aes(x = ExpDay,
+                  y = TN,
+                  colour = Treatment,
+    )) +
+    # geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
+    stat_lineribbon(aes(y = (.epred)),
+                    .width = 0,
+                    # point_interval = "mean_hdi",
+                    position = position_dodge(.5),
+                    size = .8
+    )+
+    stat_pointinterval(aes(y = (.epred)),
+                       .width = c(0.95),
+                       # position = position_dodge(.5),
+                       linewidth = 2,
+                       show.legend = FALSE
+    )+
+    scale_color_manual(values = trt.cols)+
+    matheme+
+    theme(
+      axis.title.y = ggtext::element_markdown(),
+    ) +
+    labs(y = "<span style='font-size: 13pt'>Total&nbsp;nitrogen</span>
+         <span style='font-size: 11pt'>(mg L\u207b\u00b9)</span>",
+         x = NULL)
+)
+
+(tp.pl <- nutr %>% 
+    filter(!is.na(TP)) %>% 
+    group_by(Mes_ID,ExpDay, Treatment) %>% 
+    add_epred_draws(tp.m,
+                    re_formula = NA,
+    ) %>% 
+    ggplot(., aes(x = ExpDay,
+                  y = TP,
+                  colour = Treatment,
+    )) +
+    # geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
+    stat_lineribbon(aes(y = (.epred)),
+                    .width = 0,
+                    # point_interval = "mean_hdi",
+                    position = position_dodge(.5),
+                    size = .8
+    )+
+    stat_pointinterval(aes(y = (.epred)),
+                       .width = c(0.95),
+                       # position = position_dodge(.5),
+                       linewidth = 2,
+                       show.legend = FALSE
+    )+
+    scale_color_manual(values = trt.cols)+
+    matheme+
+    theme(
+      axis.title.y = ggtext::element_markdown(),
+    ) +
+    labs(y = "<span style='font-size: 13pt'>Total  phosphorus</span>
+         <span style='font-size: 11pt'>(\u00b5g L\u207b\u00b9)</span>",
+         x = NULL)
+)
+
+(chla.pl <- nutr %>% 
+    filter(!is.na(Chla)) %>% 
+    group_by(Mes_ID,ExpDay, Treatment) %>% 
+    add_epred_draws(chla.m,
+                    re_formula = NA,
+    ) %>% 
+    ggplot(., aes(x = ExpDay,
+                  y = Chla,
+                  colour = Treatment,
+    )) +
+    # geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
+    # geom_vline(aes(xintercept = 7), linetype = "dashed", color = "#e84855", alpha = 0.4)+
+    stat_lineribbon(aes(y = (.epred)),
+                    .width = 0,
+                    # point_interval = "mean_hdi",
+                    position = position_dodge(.5),
+                    size = .8
+    )+
+    stat_pointinterval(aes(y = (.epred)),
+                       .width = c(0.95),
+                       # position = position_dodge(.5),
+                       linewidth = 2,
+                       show.legend = FALSE
+    )+
+    scale_color_manual(values = trt.cols)+
+    matheme+
+    theme(
+      axis.title.y = ggtext::element_markdown(),
+    ) +
+    labs(y = "<span style='font-size: 13pt'>Chl <i>a</i></span>
+         <span style='font-size: 11pt'>(mg L\u207b\u00b9)</span>",
+         x = NULL)
+)
+
+p.bckg <- ggarrange(treatm, par.pl + rremove("xlab"), abs.pl + rremove("xlab"),  
+                    tn.pl, tp.pl, chla.pl, 
+                    ncol = 3, nrow = 2, align = "hv",
+                    labels = "auto"
+                    # common.legend = T, legend.grob = leg.v, legend = "right"
+                    ) 
+
+p.bckg <- annotate_figure(p.bckg, 
+                          bottom = textGrob("Experimental day", gp = gpar(fontsize = 13)))
+
+p.bckg
+
+ggsave("Plots/Dec2023/background_1812.png", dpi = 300, bg = "white")
+
+## abundances-----
+(phot <- dat %>% 
+   group_by(Mes_ID,ExpDay, Treatment) %>% 
+   add_epred_draws(p.m,
+                   re_formula = NA,
+   ) %>% 
+   ggplot(., aes(x = ExpDay,
+                 y = PF_abund,
+                 colour = Treatment,
+   )) +
    stat_pointinterval(aes(y = (.epred)),
                       .width = c(0.95),
                       position = position_dodge(.5),
                       # fatten_point = 3,
                       linewidth = 2, 
                       show.legend = FALSE
-   )+
+   ) +
    geom_point(
-     data = env,
+     data = dat,
      aes(x = ExpDay,
-         y = PAR,
+         y = PF_abund,
          colour = Treatment,
          # shape = Treatment
      ),
@@ -933,91 +1159,21 @@ matheme +
      position = position_jitterdodge(dodge.width = .5),
      alpha = .35
    ) +
-   scale_color_manual(values = trt.cols)+
-   scale_fill_manual(values = trt.cols)+
-   # theme_modern()+
-   theme(
-     # legend.position = "none",
-     legend.title = element_blank(),
-     legend.background	= element_blank(),
-     legend.key	= element_blank(),
-     legend.direction = "horizontal",
-     panel.grid.minor = element_blank(),
-     panel.grid.major = element_blank(),
-     panel.background = element_blank(),
-     axis.line = element_line(colour = "black", linewidth = .3),
-     axis.text = element_text(size = 12, colour = "black"),
-     axis.title = element_text(size = 14),
-     # axis.text.y = element_text(size = 12),
-     # strip.text.y = element_text(size = 12)
-   ) +
-   labs(y = "Log(x+1) cells/mL",
-        x = "Experimental day")+
-   guides(colour = guide_legend(override.aes = list(size=4,
-                                                    color = trt.cols)))
+   scale_color_manual(values = trt.cols) +
+   scale_fill_manual(values = trt.cols) +
+   labs(title = "Phototroph",
+        y = "<span style='font-size: 13pt'>Abundance </span>
+         <span style='font-size: 11pt'>log(x+1) cells mL\u207b\u00b9</span>",
+        x = NULL)+
+   matheme +
+   theme(axis.title.y = ggtext::element_markdown(),
+         axis.title.x = element_text(size = 13),
+         plot.title = element_text(size=13, face="italic")
+   ) 
 )
 
 
-
-
-## abundances-----
-(phot.leg <- dat %>% 
-    group_by(Mes_ID,ExpDay, Treatment) %>% 
-    add_epred_draws(p.m,
-                    re_formula = NA,
-    ) %>% 
-    ggplot(., aes(x = ExpDay,
-                  y = PF_abund,
-                  colour = Treatment,
-    )) +
-   # geom_vline(aes(xintercept = 1.5), linetype = "dashed", color = "#e84855", alpha = 0.4)+
-    stat_pointinterval(aes(y = (.epred)),
-                       .width = c(0.95),
-                       position = position_dodge(.5),
-                       # fatten_point = 3,
-                       linewidth = 2, 
-                       show.legend = FALSE
-    )+
-    geom_point(
-      data = dat,
-      aes(x = ExpDay,
-          y = PF_abund,
-          colour = Treatment,
-          # shape = Treatment
-          ),
-      inherit.aes = FALSE,
-      position = position_jitterdodge(dodge.width = .5),
-      alpha = .35
-      ) +
-    scale_color_manual(values = trt.cols)+
-    scale_fill_manual(values = trt.cols)+
-    # theme_modern()+
-    theme(
-      # legend.position = "none",
-      legend.title = element_blank(),
-      legend.background	= element_blank(),
-      legend.key	= element_blank(),
-      legend.direction = "horizontal",
-      panel.grid.minor = element_blank(),
-      panel.grid.major = element_blank(),
-      panel.background = element_blank(),
-      axis.line = element_line(colour = "black", linewidth = .3),
-      axis.text = element_text(size = 12, colour = "black"),
-      axis.title = element_text(size = 14),
-      # axis.text.y = element_text(size = 12),
-      # strip.text.y = element_text(size = 12)
-    ) +
-    labs(y = "Log(x+1) cells/mL",
-         x = "Experimental day")+
-    guides(colour = guide_legend(override.aes = list(size=4,
-                                                     color = trt.cols)))
-)
-
-leg <- get_legend(phot.leg)
-# ggsave("Plots/legend2.png", leg, dpi = 300)
-phot <- phot.leg + theme(legend.position = "none")
-
-(het <- dat %>% 
+het <- dat %>% 
     group_by(Mes_ID,ExpDay, Treatment) %>% 
     add_epred_draws(h.m,
                     re_formula = NA,
@@ -1042,73 +1198,74 @@ phot <- phot.leg + theme(legend.position = "none")
       alpha = .35) +
     scale_color_manual(values = trt.cols)+
     scale_fill_manual(values = trt.cols)+
-    # theme_modern()+
-    theme(
-      legend.position = "none",
-      panel.grid.minor = element_blank(),
-      panel.grid.major = element_blank(),
-      panel.background = element_blank(),
-      axis.line = element_line(colour = "black", linewidth = .3),
-      axis.text = element_text(size = 12, colour = "black"),
-      axis.title = element_text(size = 14),
-      # axis.text.y = element_text(size = 12),
-      # strip.text.y = element_text(size = 12)
-    ) +
-    labs(y = NULL,
-         x = "Experimental day")
-)
+    labs(title = "Heterotroph", 
+         y = "<span style='font-size: 13pt'>Abundance </span>
+         <span style='font-size: 11pt'>Log(x+1) cells mL\u207b\u00b9</span>",
+         x = NULL)+
+    matheme +
+    theme(axis.title.y = ggtext::element_markdown(),
+          axis.title.x = element_text(size = 13),
+          plot.title = element_text(size=13, face="italic")
+    ) 
 
 
-(mix1 <- dat1 %>% 
-  group_by(Mes_ID,ExpDay, Treatment) %>% 
-  add_epred_draws(m.m1,
-                  re_formula = NA,
-  ) %>% 
-  ggplot(., aes(x = ExpDay,
-                y = MF_abund,
-                colour = Treatment,
-  )) +
-  stat_pointinterval(aes(y = (.epred)),
-                     .width = c(0.95),
-                     position = position_dodge(.5),
-                     # fatten_point = 3,
-                     linewidth = 2
-  )+
-  geom_point(
-    data = dat1,
-    aes(x = ExpDay,
-        y = MF_abund,
-        colour = Treatment),
-    inherit.aes = FALSE,
-    position = position_jitterdodge(dodge.width = .5),
-    alpha = .35) +
-  scale_color_manual(values = trt.cols)+
-  scale_x_discrete(breaks = c("5", "13", "21"),
-                   limits = c("5", "13", "21"))+
-  # theme_modern()+
-  theme(
-    legend.position = "none",
-    panel.grid.minor = element_blank(),
-    panel.grid.major = element_blank(),
-    panel.background = element_blank(),
-    axis.line = element_line(colour = "black", linewidth = .3),
-    axis.text = element_text(size = 12, colour = "black"),
-    axis.title = element_text(size = 14),
-    # axis.text.y = element_text(size = 12),
-    # strip.text.y = element_text(size = 12)
-  ) +
-  labs(y = NULL,
-       x = "Experimental day")
-)
+
+mix1 <- dat1 %>% 
+    group_by(Mes_ID,ExpDay, Treatment) %>% 
+    add_epred_draws(m.m1,
+                    re_formula = NA,
+    ) %>% 
+    ggplot(., aes(x = ExpDay,
+                  y = MF_abund,
+                  colour = Treatment,
+    )) +
+    stat_pointinterval(aes(y = (.epred)),
+                       .width = c(0.95),
+                       position = position_dodge(.5),
+                       # fatten_point = 3,
+                       linewidth = 2
+    )+
+    geom_point(
+      data = dat1,
+      aes(x = ExpDay,
+          y = MF_abund,
+          colour = Treatment),
+      inherit.aes = FALSE,
+      position = position_jitterdodge(dodge.width = .5),
+      alpha = .35) +
+    scale_color_manual(values = trt.cols)+
+    scale_x_discrete(breaks = c("5", "13", "21"),
+                     limits = c("5", "13", "21"))+
+    labs(title = "Mixotroph",
+         y = "<span style='font-size: 13pt'>Abundance </span>
+         <span style='font-size: 11pt'>Log(x+1) cells mL\u207b\u00b9</span>",
+         x = NULL) +
+    matheme +
+    theme(axis.title.y = ggtext::element_markdown(),
+          axis.title.x = element_text(size = 13),
+          plot.title = element_text(size=13, face="italic")
+    ) 
 
 
 
 
-p1 <- ggarrange(phot, mix1, het, ncol = 3
-                # ,common.legend = T, legend.grob = leg, legend = "bottom"
-                )+ bgcolor("white") 
 
-ggsave("Plots/Nov2023/abund_20231103.tiff", p1, dpi=300) 
+p1 <- ggarrange(phot, 
+                mix1 + rremove("ylab"), 
+                het + rremove("ylab"), 
+                ncol = 3, align = "h"
+                # , common.legend = T, legend.grob = get_legend(leg.v), legend = "right"
+                , labels = "auto"
+                )
+p1
+
+p1.an <- annotate_figure(p1, 
+                         bottom = textGrob("Experimental day", 
+                                           gp = gpar(fontsize = 13)))
+p1.h <- ggarrange(p1.an, leg.h, ncol = 1, align = "h", heights = c(3, 0.2))
+
+
+ggsave("Plots/Dec2023/abund_20231206-hleg.tiff", p1.h, dpi=300, bg = "white") 
 
 
 
@@ -1137,64 +1294,71 @@ ggsave("Plots/Nov2023/abund_20231103.tiff", p1, dpi=300)
       position = position_jitterdodge(dodge.width = .5),
       alpha = .35) +
     scale_color_manual(values = trt.cols)+
-    # theme_modern()+
-    theme(
-      legend.position = "none",
-      panel.grid.minor = element_blank(),
-      panel.grid.major = element_blank(),
-      panel.background = element_blank(),
-      axis.line = element_line(colour = "black", linewidth = .3),
-      axis.text = element_text(size = 12, colour = "black"),
-      axis.title = element_text(size = 14),
-      # axis.text.y = element_text(size = 12),
-      # strip.text.y = element_text(size = 12)
-    ) +
-    labs(y = "Log(x+1) cells mL\u207b\u00b9",
-         x = "Experimental day")
-)
-  (cyan <- dat %>% 
-      group_by(Mes_ID,ExpDay, Treatment) %>% 
-      add_epred_draws(cy.m,
-                      re_formula = NA,
-      ) %>% 
-      ggplot(., aes(x = ExpDay,
-                    y = CY_abund,
-                    colour = Treatment,
-      )) +
-      stat_pointinterval(aes(y = (.epred)),
-                         .width = c(0.95),
-                         position = position_dodge(.5),
-                         # fatten_point = 3,
-                         linewidth = 2
-      )+
-      geom_point(
-        data = dat,
-        aes(x = ExpDay,
-            y = CY_abund,
-            colour = Treatment),
-        inherit.aes = FALSE,
-        position = position_jitterdodge(dodge.width = .5),
-        alpha = .4) +
-      scale_color_manual(values = trt.cols)+
-
-      # theme_modern()+
-      theme(
-        legend.position = "none",
-        panel.grid.minor = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.background = element_blank(),
-        axis.line = element_line(colour = "black", linewidth = .3),
-        axis.text = element_text(size = 12, colour = "black"),
-        axis.title = element_text(size = 14),
-        # axis.text.y = element_text(size = 12),
-        # strip.text.y = element_text(size = 12)
-      ) +
-      labs(y = NULL,
-           x = "Experimental day")
+    labs(title = "Heterotrophic bacteria",
+         y = "<span style='font-size: 13pt'>Abundance </span>
+         <span style='font-size: 11pt'>log(x+1) cells mL\u207b\u00b9</span>",
+         x = "Experimental Day") +
+    matheme +
+    theme(axis.title.y = ggtext::element_markdown(),
+          axis.title.x = element_text(size = 13),
+          plot.title = element_text(size=13, face="italic")
+    ) 
 )
 
-p2 <- ggarrange(bact, cyan, align = "h") + bgcolor("white")
-ggsave("Plots/Nov2023/bact_20231030.tiff", p2, dpi=300)
+(cyan <- dat %>% 
+    group_by(Mes_ID,ExpDay, Treatment) %>% 
+    add_epred_draws(cy.m,
+                    re_formula = NA,
+    ) %>% 
+    ggplot(., aes(x = ExpDay,
+                  y = CY_abund,
+                  colour = Treatment,
+    )) +
+    stat_pointinterval(aes(y = (.epred)),
+                       .width = c(0.95),
+                       position = position_dodge(.5),
+                       # fatten_point = 3,
+                       linewidth = 2
+    )+
+    geom_point(
+      data = dat,
+      aes(x = ExpDay,
+          y = CY_abund,
+          colour = Treatment),
+      inherit.aes = FALSE,
+      position = position_jitterdodge(dodge.width = .5),
+      alpha = .4) +
+    scale_color_manual(values = trt.cols)+
+    labs(title = "Cyanobacteria",
+         y = "<span style='font-size: 13pt'>Abundance </span>
+         <span style='font-size: 11pt'>log(x+1) cells mL\u207b\u00b9</span>",
+         x = NULL) +
+    matheme +
+    theme( axis.title.y = ggtext::element_markdown(),
+           axis.title.x = element_text(size = 13),
+           plot.title = element_text(size=13, face="italic")
+    ) 
+)
+
+p2 <- ggarrange(bact, cyan + rremove("ylab"), align = "h",
+                labels = "auto"
+                # , common.legend = T, legend.grob = get_legend(leg.v), legend = "right"
+                )
+
+p2.an <- annotate_figure(p2, 
+                         bottom = textGrob("Experimental day", 
+                                           gp = gpar(fontsize = 13)))
+p2.h <- ggarrange(p2.an, leg.h, ncol = 1, align = "h", heights = c(3, 0.2))
+
+p2.1 <- ggarrange(cyan,  bact,
+                  ncol = 1, align = "v",
+                labels = "auto"
+                # , common.legend = T, legend.grob = get_legend(leg.h), legend = "bottom"
+)
+
+
+
+ggsave("Plots/Dec2023/bact-V_20231218-noleg.tiff", p2.1, dpi=300, bg = "white")
 
 
 
@@ -1235,39 +1399,42 @@ env %>%
 ## rates ----
 
 (mir <- dat1 %>% 
-    group_by(Mes_ID,ExpDay, Treatment) %>% 
-    add_epred_draws(mir.m1,
-                    re_formula = NA,
-    ) %>% 
-    ggplot(., aes(x = ExpDay,
-                  y = M.Ir,
-                  colour = Treatment,
-    )) +
-    stat_pointinterval(aes(y = (.epred)),
-                       .width = c(0.95),
-                       position = position_dodge(.5),
-                       # fatten_point = 3,
-                       linewidth = 2
-    )+
-    geom_point(
-      data = dat1,
-      aes(x = ExpDay,
-          y = M.Ir,
-          colour = Treatment),
-      inherit.aes = FALSE,
-      position = position_jitterdodge(dodge.width = .5),
-      alpha = .5) +
-    scale_color_manual(values = trt.cols)+
-    scale_fill_manual(values = trt.cols)+
-    # theme_modern()+
-matheme+
-    labs(y = "Ingestion rate (FLB cell\u207b\u00b9 h\u207b\u00b9)", 
-      # y =paste0("<span style='font-size: 13pt'>Ingestion rate </span><span style='font-size: 11pt'>(FLB cell\u207b\u00b9 h\u207b\u00b9)</span>"),
-         x = NULL))+
-    theme(
-      axis.title.y = ggtext::element_markdown(),
-    #   # strip.text.y = element_text(size = 12)
-    ) 
+   group_by(Mes_ID,ExpDay, Treatment) %>% 
+   add_epred_draws(mir.m1,
+                   re_formula = NA,
+   ) %>% 
+   ggplot(., aes(x = ExpDay,
+                 y = M.Ir,
+                 colour = Treatment,
+   )) +
+   stat_pointinterval(aes(y = (.epred)),
+                      .width = c(0.95),
+                      position = position_dodge(.5),
+                      # fatten_point = 3,
+                      linewidth = 2
+   )+
+   geom_point(
+     data = dat1,
+     aes(x = ExpDay,
+         y = M.Ir,
+         colour = Treatment),
+     inherit.aes = FALSE,
+     position = position_jitterdodge(dodge.width = .5),
+     alpha = .35) +
+   scale_color_manual(values = trt.cols)+
+   scale_fill_manual(values = trt.cols)+
+   # theme_modern()+
+   labs(
+     title = "Mixotroph",
+     y ="<span style='font-size: 13pt'>Ingestion rate</span>
+      <span style='font-size: 11pt'>(FLB cell\u207b\u00b9 h\u207b\u00b9)</span>",
+     x = NULL)+
+  matheme+
+  theme(
+    axis.title.y = ggtext::element_markdown(),
+    axis.title.x = element_text(size = 13),
+    plot.title = element_text(size=13, face="italic"))
+  ) 
 
 (mgr <- dat1 %>% 
     group_by(Mes_ID,ExpDay, Treatment) %>% 
@@ -1291,19 +1458,19 @@ matheme+
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
-      alpha = .5) +
+      alpha = .35) +
     scale_color_manual(values = trt.cols)+
     scale_fill_manual(values = trt.cols)+
     # theme_modern()+
-matheme+
     labs(
-      # y = paste0("<span style='font-size: 13pt'>Grazing rate </span><span style='font-size: 11pt'>(bacteria cell\u207b\u00b9 h\u207b\u00b9)</span>"),
-      y = "Grazing rate (bacteria cell\u207b\u00b9 h\u207b\u00b9)",
-         x = "Experimental day"))+
-    theme(
-      axis.title.y = ggtext::element_markdown(),
-    #   # strip.text.y = element_text(size = 12)
-    ) 
+      y ="<span style='font-size: 13pt'>Grazing rate</span>
+         <span style='font-size: 11pt'>(bacteria cell\u207b\u00b9 h\u207b\u00b9)</span>",
+      x = NULL)+
+  matheme+
+  theme(
+    axis.title.y = ggtext::element_markdown(),
+    axis.title.x = element_text(size = 13))
+)
 
 (hir <- dat1 %>% 
     group_by(Mes_ID,ExpDay, Treatment) %>% 
@@ -1327,16 +1494,16 @@ matheme+
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
-      alpha = .5) +
+      alpha = .35) +
     scale_color_manual(values = trt.cols)+
     scale_fill_manual(values = trt.cols)+
     # theme_modern()+
-matheme+
-    theme(    axis.title.y = ggtext::element_markdown())+
-    #   # strip.text.y = element_text(size = 12)
-    # ) +
-    labs(y = NULL,
-         x = NULL))
+    labs(title = "Heterotroph",
+         y = NULL,
+         x = NULL)+
+    matheme+
+    theme(plot.title = element_text(size=13, face="italic"))
+)
 
 (hgr <- dat1 %>% 
     group_by(Mes_ID,ExpDay, Treatment) %>% 
@@ -1360,36 +1527,33 @@ matheme+
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
-      alpha = .5) +
+      alpha = .35) +
     scale_color_manual(values = trt.cols)+
     scale_fill_manual(values = trt.cols)+
     # theme_modern()+
 matheme+
-    theme(    axis.title.y = ggtext::element_markdown())+
-    #   # strip.text.y = element_text(size = 12)
-    # ) +
     labs(y = NULL,
-         x = "Experimental day"))
+         x = NULL))
 
-library(ggpubr)
-p3 <- ggarrange(mir, hir, mgr, hgr, align = "hv") + bgcolor("white") 
-  theme(    axis.title.y = ggtext::element_markdown())
+p3 <- ggarrange(mir, hir, mgr, hgr, 
+                ncol = 2, nrow = 2,
+                align = "hv",
+                labels = "auto"
+                # , common.legend = T, legend.grob = get_legend(leg.v), legend = "right"
+                )
+p3.an <- annotate_figure(p3, 
+                          bottom = textGrob("Experimental day", 
+                                            gp = gpar(fontsize = 13)))
+p3.h <- ggarrange(p3.an, leg.h, ncol = 1, align = "h", heights = c(3, 0.2))
 
-ggsave("Plots/rates_2_20231101.png",p3, dpi = 300)
-ggsave("Plots/Mir_20231101.png",mir, height = 3.63, width = 3.94, units = "in", dpi = 300)
 
+ggsave("Plots/Dec2023/rates_20231219-no.png",p3.an, dpi = 300, bg = "white")
 
-
-plot_grid(mir, hir, mgr, hgr, align = "hv")
-library(patchwork)
-mir+ hir+ mgr+ hgr
-
-library(ragg)
-agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in", res = 72)
+# ragg::agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in", res = 72)
 
 ## biovolume ----
 
-(phot.vol <- dat %>% 
+phot.vol <- dat %>% 
    group_by(Mes_ID,ExpDay, Treatment) %>% 
    add_epred_draws(ps.m,
                    re_formula = NA,
@@ -1415,23 +1579,20 @@ agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in",
    scale_color_manual(values = trt.cols)+
    scale_fill_manual(values = trt.cols)+
    # theme_modern()+
-   theme(
-     legend.position = "none",
-     panel.grid.minor = element_blank(),
-     panel.grid.major = element_blank(),
-     panel.background = element_blank(),
-     axis.line = element_line(colour = "black", linewidth = .3),
-     axis.text = element_text(size = 11, colour = "black"),
-     axis.title = element_text(size = 13),
-     # axis.text.y = element_text(size = 12),
-     # strip.text.y = element_text(size = 12)
-   ) +
-   labs(y = "Biovolume log(x+1) \u00b5m\u00b3 mL\u207b\u00b9",
-        x = "Experimental day")
- )
+   labs(
+     # title = "Phototroph", 
+        y = "<span style='font-size: 13pt'>Biovolume </span>
+         <span style='font-size: 11pt'>log(x+1) &nbsp;  \u00b5m\u00b3 mL\u207b\u00b9</span>",
+        x = NULL)+
+   matheme +
+   theme(axis.title.y = ggtext::element_markdown(),
+         axis.title.x = element_text(size = 13),
+         plot.title = element_text(size=13, face="italic")
+   ) 
+ 
 
 
-(het.vol <- dat %>% 
+het.vol <- dat %>% 
    group_by(Mes_ID,ExpDay, Treatment) %>% 
    add_epred_draws(hs.m,
                    re_formula = NA,
@@ -1457,24 +1618,21 @@ agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in",
    scale_color_manual(values = trt.cols)+
    scale_fill_manual(values = trt.cols)+
    # theme_modern()+
-   theme(
-     legend.position = "none",
-     panel.grid.minor = element_blank(),
-     panel.grid.major = element_blank(),
-     panel.background = element_blank(),
-     axis.line = element_line(colour = "black", linewidth = .3),
-     axis.text = element_text(size = 11, colour = "black"),
-     axis.title = element_text(size = 13),
-     # axis.text.y = element_text(size = 12),
-     # strip.text.y = element_text(size = 12)
-   ) +
-   labs(y = NULL,
-        x = "Experimental day")
-)
+    labs(
+      # title = "Heterotroph", 
+         y = "<span style='font-size: 13pt'>Biovolume </span>
+         <span style='font-size: 11pt'>log(x+1) &nbsp;  \u00b5m\u00b3 mL\u207b\u00b9</span>",
+         x = NULL)+
+    matheme +
+    theme(axis.title.y = ggtext::element_markdown(),
+          axis.title.x = element_text(size = 13),
+          plot.title = element_text(size=13, face="italic")
+    ) 
 
-(mix.vol1 <- dat1 %>% 
+
+mix.vol1 <- dat1 %>% 
    group_by(Mes_ID,ExpDay, Treatment) %>% 
-   add_epred_draws(ms.m,
+   add_epred_draws(ms.m1,
                    re_formula = NA,
    ) %>% 
    ggplot(., aes(x = ExpDay,
@@ -1499,23 +1657,53 @@ agg_tiff("Plots/rates_2_20231101.tiff",p3, width=7.88, height=7.26,units = "in",
    scale_x_discrete(breaks = c("5", "13", "21"),
                     limits = c("5", "13", "21"))+
    # theme_modern()+
-   theme(
-     legend.position = "none",
-     panel.grid.minor = element_blank(),
-     panel.grid.major = element_blank(),
-     panel.background = element_blank(),
-     axis.line = element_line(colour = "black", linewidth = .3),
-     axis.text = element_text(size = 11, colour = "black"),
-     axis.title = element_text(size = 13),
-     # axis.text.y = element_text(size = 12),
-     # strip.text.y = element_text(size = 12)
-   ) +
-   labs(y = NULL,
-        x = "Experimental day")
-)
+    labs(
+      # title = "Mixotroph", 
+         y = "<span style='font-size: 13pt'>Biovolume </span>
+         <span style='font-size: 11pt'>log(x+1) &nbsp;  \u00b5m\u00b3 mL\u207b\u00b9</span>",
+         x = NULL)+
+    matheme +
+    theme(axis.title.y = ggtext::element_markdown(),
+          axis.title.x = element_text(size = 13),
+          plot.title = element_text(size=13, face="italic")
+    ) 
 
-p4 <- ggarrange(phot.vol, mix.vol1, het.vol, nrow = 1, align = "h")
 
-ggsave("Plots/Nov2023/20231103_biovolumes.tiff", p4, dpi = 300)
+p4 <- ggarrange(phot.vol, 
+                mix.vol1 + rremove("ylab"), 
+                het.vol + rremove("ylab"), 
+                ncol = 3, align = "h"
+                # , common.legend = T, legend.grob = get_legend(leg.v), legend = "right"
+                , labels = "auto"
+                )
 
+p4.an <- annotate_figure(p4, 
+                         bottom = textGrob("Experimental day", 
+                                           gp = gpar(fontsize = 13)))
+
+p4.h <- ggarrange(p4.an, leg.h, ncol = 1, align = "h", heights = c(3, 0.2))
+
+
+ggsave("Plots/Dec2023/biovol_20231206-hleg.tiff", p4.an, dpi=300, bg = "white") 
+
+# combined abundance and biovolume
+p5 <- ggarrange(phot, 
+                mix1 + rremove("ylab"), 
+                het + rremove("ylab"), 
+                phot.vol, 
+                mix.vol1 + rremove("ylab"), 
+                het.vol + rremove("ylab"), 
+                ncol = 3, nrow = 2, align = "hv"
+                # , common.legend = T, legend.grob = get_legend(leg.v), legend = "right"
+                , labels = "auto"
+                )
+
+p5.an <- annotate_figure(p5, 
+                         bottom = textGrob("Experimental day", 
+                                           gp = gpar(fontsize = 13)))
+
+p5.h <- ggarrange(p5.an, leg.h, ncol = 1, align = "h", heights = c(3, 0.2))
+
+
+ggsave("Plots/Dec2023/abund-biov_20231219-noleg.png", p5.an,  dpi=300, bg = "white") 
 
