@@ -11,10 +11,9 @@ trt.cols <- c(`C`= "#000000", #black - C
 
 
 
-## DATA ======
-## and some data wrangling
+## MICROSCOPE DATA ======
 
-## ABUNDANCE
+### ABUNDANCE ----
 master.dat <- read_xlsx("Data/SITES_microscope_data_working.xlsx", 
                         sheet = "0.8_samples", 
                         range = "A1:Q217", 
@@ -51,7 +50,7 @@ partial_dat <- within(partial_dat, Cells_counted <- ifelse(is.na(Cells_counted),
                                                            celltofield * Fields_counted,
                                                            Cells_counted))
 
-## SIZE
+### SIZE ----
 # THIS IS MESSY
 # Load the size data. If the number of cells (rows) are more than 30 withing the Incubation - Treatment
 # - GROUP grouping, select only 30. This is done in a new df. Then take the <30 rows group and merge them with 
@@ -87,14 +86,13 @@ sz.data <- size.dat %>%
 # end of messiness
 
 
-## INGESTION
+### INGESTION ----
 
 ingest <- read_xlsx("Data/SITES_microscope_data_working.xlsx", 
                     sheet = "Ingestion",  
                     range = "A1:K5361", # change accordingly
-                    col_names = T) 
-
-ING <- ingest %>% 
+                    col_names = T) %>% 
+  
   separate(Sample, into = c("inc", "Bag", "time", "filter"), sep = "_", remove = T) %>% 
   select(-time, -filter) %>% 
   mutate( Incubation = as.numeric(substring(inc, 3, 3)),
@@ -102,8 +100,6 @@ ING <- ingest %>%
           Mesocosm = as.factor(substring(Bag, 1, 2)),
           Replicate = substring(Bag, 3, 3)) %>% 
   group_by(Incubation, Treatment, Mesocosm, Replicate, Time_point, Grazer) %>% 
-  # distinct(FLB_presence, Num_FLB, .keep_all = TRUE) 
-  # mutate(nomnom = paste0(FLB_presence, "", Num_FLB))
   
   summarise(cells_feeding = sum(FLB_presence),
             flb_ingest = sum(Num_FLB, na.rm = T)) %>% # pay attention here! what's happening with the NAs?
@@ -111,15 +107,14 @@ ING <- ingest %>%
   inner_join(., partial_dat %>%
                select(Incubation, Treatment, Mesocosm, Mes_ID, Replicate, Time_point),
              by = c("Incubation", "Treatment", "Mesocosm", "Replicate", "Time_point")) %>%
-  # mutate(flbc = 100*flb_ingest/Cells_counted) %>% 
   pivot_wider(names_from = c(Time_point, Grazer), 
               values_from = c(cells_feeding, flb_ingest
               )) 
-ING$Mes_ID <- as.factor(ING$Mes_ID)
+ingest$Mes_ID <- as.factor(ING$Mes_ID)
 
 # correct ingestion rates
 # subtract number of cells with FLB and number of FLB
-IR1 <- ING %>% 
+IR1 <- ingest %>% 
   inner_join(., partial_dat %>%
                filter(Time_point == "Tend") %>% 
                select(Incubation, Treatment, Mesocosm, Mes_ID, Replicate, PF, HF), 
@@ -135,7 +130,7 @@ IR1 <- ING %>%
     Treatment = fct_relevel(Treatment, c("C","D","I","E"))) %>% 
   select(-contains(c("cells", "Tstart"))) 
 
-#if I replace with NA it gives NA in the summary
+#convert all infinite and negative values to 0
 IR1[sapply(IR1, is.infinite)] <- 0
 IR1[sapply(IR1, is.na)] <- 0
 IR1$MFir[IR1$MFir<0] <- 0
@@ -149,18 +144,18 @@ dat <- partial_dat %>%
 
 dat$aMFc[dat$aMFc<0] <- 0
 
-bdat <- dat %>% 
-  select(Incubation, Treatment, Mes_ID, Replicate, aHF, aMFc, aPF) %>% 
-  pivot_longer(cols = c(aHF, aPF, aMFc), names_to = "agroup", values_to = "abundance") %>% 
-  mutate(GROUP = substring(agroup, 2, 3))  %>% 
-  inner_join(., sz.data, by = c("Incubation", "Treatment", "GROUP")) %>% 
-  mutate(biovol = abundance *mean.cell.vol,
-    biomass = abundance * (0.216*mean.cell.vol^0.939)) %>%  # Menden-Deuer Lessard 2000, pgC/mL
-  select(Incubation, Treatment, Mes_ID, Replicate, GROUP, biomass, biovol) %>% 
-  pivot_wider(names_from = GROUP, values_from =c(biomass, biovol), values_fn = mean)
-# bdat$MF[is.na(bdat$MF)] <- 0
+# bdat <- dat %>% 
+#   select(Incubation, Treatment, Mes_ID, Replicate, aHF, aMFc, aPF) %>% 
+#   pivot_longer(cols = c(aHF, aPF, aMFc), names_to = "agroup", values_to = "abundance") %>% 
+#   mutate(GROUP = substring(agroup, 2, 3))  %>% 
+#   inner_join(., sz.data, by = c("Incubation", "Treatment", "GROUP")) %>% 
+#   mutate(biovol = abundance *mean.cell.vol,
+#     biomass = abundance * (0.216*mean.cell.vol^0.939)) %>%  # Menden-Deuer Lessard 2000, pgC/mL
+#   select(Incubation, Treatment, Mes_ID, Replicate, GROUP, biomass, biovol) %>% 
+#   pivot_wider(names_from = GROUP, values_from =c(biomass, biovol), values_fn = mean)
 
-## BACTERIA
+
+### BACTERIA ----
 
 bact.dat <- read_xlsx("Data/SITES_microscope_data_working.xlsx", 
                       sheet = "0.2_samples",  
@@ -178,17 +173,7 @@ bact.dat <- read_xlsx("Data/SITES_microscope_data_working.xlsx",
 bact.dat$Mesocosm <- as.factor(bact.dat$Mesocosm)
 bact.dat$Mes_ID <- as.factor(bact.dat$Mes_ID)
 
-GR <- IR1 %>% 
-  left_join(., bact.dat, by = c("Incubation", "Treatment", "Mesocosm", "Mes_ID", "Replicate")) %>% 
-  mutate(
-    Gm = (flb_MF_corr*HB_abund/FLB_abund)*0.5,
-    Gh = (flb_HF_corr*HB_abund/FLB_abund)*0.5) %>% 
-  select(-contains(c("cells", "Tstart")), -Sample, -Time_point, -Date) 
-GR[sapply(GR, is.infinite)] <- 0
-GR[sapply(GR, is.nan)] <- 0
-GR$Gh[GR$Gh<0] <- 0
-GR$Gm[GR$Gm<0] <- 0
-
+# grazing rate
 GR1 <- IR1 %>% 
   left_join(., bact.dat, by = c("Incubation", "Treatment", "Mesocosm", "Mes_ID", "Replicate")) %>% 
   mutate(
