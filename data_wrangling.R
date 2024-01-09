@@ -185,5 +185,222 @@ GR1[sapply(GR1, is.nan)] <- 0
 GR1$Gh[GR1$Gh<0] <- 0
 GR1$Gm[GR1$Gm<0] <- 0
 
-
 # remove(master.dat, partial_dat, size.dat, sz.many, sz.data, ingest, ING)
+
+## BACKGROUND DATA =====
+
+# absorbance
+absorbance <- read_xlsx("Data/Erken DOM absorbence data.xlsx", 
+                        sheet = 2,
+                        range = "A2:H184",
+                        col_names = T,
+                        col_types = c("date", "guess", "guess", "numeric", 
+                                      "numeric", "numeric", "numeric", "numeric")) %>% 
+  # "filtered" the dates in Excel - it was horrible, different formats etc
+  rename(Mes_ID = `Mesocosm ID`,
+         A420_5 = `Abs. 420 (5cm)`,
+         A254_5 = `Abs. 254 (5cm)`,
+         A420_1 = `Abs. 420 (1 cm)`,
+         A254_1 = `Abs. 254 (1 cm)`,
+         Mesocosm = `Treatment ID`,
+         ExpDay = Day) %>% 
+  select(-Date) %>% 
+  mutate(Mes_ID = as.numeric(Mes_ID),
+         # use the 5cm cuvette and convert to m
+         a420 = 100*A420_5/5)
+# replace NAs with the date; it adds 26 to the origin date = 27
+# absorbance[sapply(absorbance, is.na)] <- as.Date(26, origin = "2022-07-01") 
+
+# Total phosphorus and Chla
+TP_Chla <- read_xlsx("Data/TP Chl Erken and Bolmen.xlsx", 
+                     sheet = 1, 
+                     range = "A3:M103",
+                     col_names = T) %>% 
+  select(Provtagningsdatum, Provplats...11, `Totalfosfor EV09 SFM (µg/l)`, `Klorofyll a (µg/l)`) %>% 
+  rename(Date = Provtagningsdatum,
+         mes = Provplats...11,
+         TP = `Totalfosfor EV09 SFM (µg/l)`,
+         Chla = `Klorofyll a (µg/l)`) %>% 
+  mutate(Date = as.Date(Date)) %>% 
+  separate(mes, into = c("text", "Mes_ID")) %>% 
+  select(-text) %>% 
+  # filter(MesID %in% dat$Mes_ID, Date %in% mydates) %>% 
+  # change date to experimental day
+  mutate(ExpDay = case_when(Date == "2022-07-07" ~ 0,
+                            Date == "2022-07-11" ~ 4,
+                            Date == "2022-07-15" ~ 8,
+                            Date == "2022-07-19" ~ 12,
+                            Date == "2022-07-27" ~ 20,
+                            Date == "2022-08-12" ~ 36)) %>% 
+  mutate(Mes_ID = as.numeric(Mes_ID))
+
+# Other nutrients
+Dnut <- read_xlsx("Data/TOC_TN_DOC_DN_Erken_Bolmen_20230223.xlsx",
+                  sheet = 2,
+                  range = "A5:F131",
+                  col_names = T,
+                  col_types = c("numeric", "numeric", "numeric","numeric","numeric","numeric")) %>% 
+  filter(complete.cases(.), 
+         # `Sample nr` %in% dat$Mes_ID, Day %in% mydays
+  ) %>% 
+  rename(Mes_ID = `Sample nr`) %>% 
+  # sampling day to experimental day
+  mutate(ExpDay = case_when(Day == 0 ~ 0,
+                            Day == 1 ~ 4,
+                            Day == 2 ~ 8,
+                            Day == 3 ~ 12,
+                            Day == 5 ~ 20,
+                            Day == 9 ~ 36))
+
+
+# Sensor data
+backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
+                  header = T) %>% 
+  pivot_longer(cols = 2:117, names_to = "varbl", values_to = "val") %>% 
+  separate(varbl, into = c("vrbl", "Mes_ID"), sep = "\\.") %>% 
+  pivot_wider(id_cols = c("TIMESTAMP", "Mes_ID"), names_from = "vrbl", values_from = "val") %>% 
+  select(-contains("lake")) %>% 
+  filter(!is.na(Mes_ID)) %>%   
+  rename(PAR = PAR_Apogee,
+         DOsat = DOsat_optode,
+         Temp = Temp_optode,
+         DOconc = DOconc_optode) %>% 
+  mutate(
+    ExpDay = case_when(TIMESTAMP == "2022-07-07" ~ 0,
+                       TIMESTAMP == "2022-07-08" ~ 1,
+                       TIMESTAMP == "2022-07-09" ~ 2,
+                       TIMESTAMP == "2022-07-10" ~ 3,
+                       TIMESTAMP == "2022-07-11" ~ 4,
+                       TIMESTAMP == "2022-07-12" ~ 5,
+                       TIMESTAMP == "2022-07-13" ~ 6,
+                       TIMESTAMP == "2022-07-14" ~ 7,
+                       TIMESTAMP == "2022-07-15" ~ 8,
+                       TIMESTAMP == "2022-07-16" ~ 9,
+                       TIMESTAMP == "2022-07-17" ~ 10,
+                       TIMESTAMP == "2022-07-18" ~ 11,
+                       TIMESTAMP == "2022-07-19" ~ 12,
+                       TIMESTAMP == "2022-07-20" ~ 13,
+                       TIMESTAMP == "2022-07-21" ~ 14,
+                       TIMESTAMP == "2022-07-22" ~ 15,
+                       TIMESTAMP == "2022-07-23" ~ 16,
+                       TIMESTAMP == "2022-07-24" ~ 17,
+                       TIMESTAMP == "2022-07-25" ~ 18,
+                       TIMESTAMP == "2022-07-26" ~ 19,
+                       TIMESTAMP == "2022-07-27" ~ 20,
+                       TIMESTAMP == "2022-07-28" ~ 21),
+    Mes_ID = as.numeric(Mes_ID),
+    Treatment = case_when(Mes_ID == 1 | Mes_ID == 7 | Mes_ID == 10 | Mes_ID == 16 ~ "C",
+                          Mes_ID == 2 | Mes_ID == 8 | Mes_ID == 11 | Mes_ID == 13 ~ "D",
+                          Mes_ID == 3 | Mes_ID == 5 | Mes_ID == 12 | Mes_ID == 14 ~ "I",
+                          Mes_ID == 4 | Mes_ID == 6 | Mes_ID == 9 | Mes_ID == 15 ~ "E")
+  ) 
+
+## ROTIFERS ====
+
+rotifers <- read_xlsx("Data/rotifers_volvoxes.xlsx",
+                      sheet = 1, range = "A1:K107", col_names = T) %>% 
+  rename(ExpDay = `day of experiment`,
+         Treatment = treatment,
+         vol = `sample volume (ml)`) %>% 
+  filter(mesocosm!="LE") %>% 
+  mutate(
+    # taking rotifer colonies as 1 individual, per L
+    Rotif = 1000*(`small rotifers`+ asplanchna + kellicottia + `rotifer colony`)/vol,
+        # small rotifers are probably Keratella
+    small = 1000*`small rotifers`/vol,
+        # rotifer colonies are probably Conochilus 
+    coln = 1000*`rotifer colony`/vol,
+    Kell = 1000*kellicottia/vol,
+    Aspl = 1000*asplanchna/vol,
+    Mes_ID = as.numeric(mesocosm)) %>%  
+  pivot_longer(cols = c(small, coln, Kell, Aspl), 
+               names_to = "rotif.sp", values_to = "abund") %>% 
+  select(ExpDay, Treatment, Mes_ID, rotif.sp, abund, Rotif)
+
+
+rot.meas <- read_xlsx("Data/Erken_zoo_measurements_2016-2019.xlsx", 
+                      sheet = 1, range = "A1:O2023", col_names = T) %>% 
+  select(-c(Site, Comment1, `Dyntaxa ID`, `Analysis method`, `Analysis laboratory`)) %>% 
+  # keeping only rotifers in the summer months
+  mutate(month = substr(as.character(Date), 3, 4)) %>% 
+  filter(month %in% c("06", "07", "08"),
+         Phylum == "Rotifera") %>% 
+  # get the "volume" not biovolume
+  mutate(indv.vol = `Biovol.(µm³/l)`/ `Density(n/l)`) %>% 
+  # keeping only the genus
+  separate(ScientificName, c("Genus", NA), remove = T) %>% 
+  group_by(Genus) %>% 
+  summarise(indv.vol.m = mean(indv.vol),
+            indv.vol.sd = sd(indv.vol),
+            biovol.m = mean(`Biovol.(µm³/l)`),
+            biovol.sd = sd(`Biovol.(µm³/l)`),
+            length.m = mean(`Mesured length (µm)`),
+            length.sd = sd(`Mesured length (µm)`),
+            FW.m = mean(`Freshweight(mg/l)`),
+            FW.sd = sd(`Freshweight(mg/l)`)) %>% 
+  as.data.frame()
+
+rot <-  rotifers %>% 
+  mutate(rot.vol = case_when(rotif.sp == "small" ~ 
+                               rot.meas[rot.meas$Genus == "Keratella", "indv.vol.m"],
+                             rotif.sp == "Aspl" ~ 
+                               rot.meas[rot.meas$Genus == "Asplanchna", "indv.vol.m"],
+                             rotif.sp == "coln" ~ 
+                               rot.meas[rot.meas$Genus == "Conochilus", "indv.vol.m"],
+                             rotif.sp == "Kell" ~ 
+                               rot.meas[rot.meas$Genus == "Kellicottia", "indv.vol.m"]),
+         # biovolume in µm³/l
+         biovol = abund * rot.vol) 
+
+## CREATE DATA FILES ====
+# put it all together
+
+
+envir <- full_join(Dnut, TP_Chla, by = c("Mes_ID", "ExpDay")) %>% 
+  # TP & Chla in ug/L, other nutr in mg/L
+  full_join(., absorbance, by = c("Mes_ID", "ExpDay")) %>%
+  full_join(., backg, by = c("Mes_ID", "ExpDay")) %>%
+  mutate(Treatment = substring(Mesocosm, 1, 1),
+         Treatment = case_when(Mes_ID == 1 | Mes_ID == 7 | Mes_ID == 10 | Mes_ID == 16 ~ "C",
+                               Mes_ID == 2 | Mes_ID == 8 | Mes_ID == 11 | Mes_ID == 13 ~ "D",
+                               Mes_ID == 3 | Mes_ID == 5 | Mes_ID == 12 | Mes_ID == 14 ~ "I",
+                               Mes_ID == 4 | Mes_ID == 6 | Mes_ID == 9 | Mes_ID == 15 ~ "E"),
+         suva = (A254_1/DOC)*100) %>% # L/mg*m
+  select(-contains("id", ignore.case = F), -contains("Date"), -Day, -TIMESTAMP, -Mesocosm) %>% 
+  left_join(., rotifers, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
+  filter(!is.na(Mes_ID)) %>% 
+  arrange(ExpDay) %>% 
+  # keep only relevant mesocosms and time period
+  filter(Mes_ID %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16),
+         ExpDay<=21) %>% 
+  select(-c(A254_5, A420_5, A254_1, A420_1, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy, Temp)) %>% 
+  as.data.frame()
+  #### NOTE! The env data don't match with my data on experimental day. They are a day before,
+  #### so change it to be the same depending on the analysis
+  ## mutate(ExpDay = case_when(ExpDay == 4 ~ 5,
+  ##                           ExpDay == 12 ~ 13,
+  ##                           ExpDay == 20 ~ 21)) %>% 
+  ## filter(!is.na(ExpDay)) %>% 
+  
+data = dat %>% 
+  mutate(ExpDay = case_when(Incubation == 1 ~ 5,
+                            Incubation == 2 ~ 13,
+                            Incubation == 3 ~ 21)) %>% 
+  left_join(., GR1, by = c("Incubation", "Treatment", "Mes_ID", "Replicate")) %>% 
+  left_join(., bdat, by = c("Incubation", "Treatment", "Mes_ID", "Replicate")) %>% 
+  select(-contains(".x"), -contains("Tend"), -contains("corr"), -id, -Sample) %>% 
+  mutate(Mes_ID = as.numeric(as.character(Mes_ID))) %>%
+  rename(M.Ir = MFir.y,
+         H.Ir = HFir.y, 
+         PF_abund = aPF,
+         HF_abund = aHF,
+         MF_abund = aMFc,
+         M.Gr = Gm,
+         H.Gr = Gh,
+         Mesocosm = Mesocosm.y) %>% 
+  as.data.frame() %>% 
+  select(-contains(".y"), -c(MF, aMF, PF, HF, Replicate, Incubation, Mesocosm)) %>% 
+  relocate(ExpDay, .before = Treatment)
+
+# save the above data frame and the colours so you don't have to run all this every time
+save(data, envir, rot, trt.cols, file = "all_data.RData")

@@ -4,28 +4,20 @@ library(brms)
 library(tidybayes)
 library(modelr)
 library(emmeans)
-library(loo)
-library(rempsyc)
+
 library(ggpubr)
 library(grid)
 
 
 # all models in Bayes
 
-# data
+# data -----
 load("all_data.RData")
 
-# mysc <- function(x){
-#   (x-mean(x))/sd(x)
-# }
 mytr <- function(x){
   log10(x+1)
 }
-# 
-# trt.cols2 <-  c(`C`= "#1a1a1a", #black - C
-#                 `D`= "#20854e", #g - D
-#                 `I`= "#0072b5", #blu - I
-#                 `E`= "#bc3c29") #r - E
+
 # all days 
 # no transformation
 env <- envir %>% 
@@ -36,54 +28,33 @@ env <- envir %>%
          # scale all predictors
          # across(DOC:Nutr, mysc),
                 # ~(.-mean(.)) / sd(.)
-                ExpDay = factor(ExpDay)
-         )
+                ExpDay = factor(ExpDay))
   
 dat <- data %>% 
   relocate(c(M.Ir, H.Ir, M.Gr, H.Gr), .after = biovol_MF) %>% 
   # log(x + 1) transormed
     mutate(across(4:16, mytr),
-           ExpDay = factor(ExpDay
-                           # , levels = c("5", "13", "21")
-           )
-) 
+           ExpDay = factor(ExpDay)) 
+
 # take out day 5
 dat1 <- dat %>% filter(ExpDay !="5") %>% droplevels() %>% 
   mutate(Treatment = as.factor(Treatment))
 
-zoop <- full_join(rot1, zoop1, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
-  ungroup() %>% 
-  mutate(ExpDay = as.factor(ExpDay))
+zoop <-   rot %>% 
+  select(-rotif.sp) %>% 
+  filter(Mes_ID %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16)) %>% 
+  group_by(ExpDay,Treatment, Mes_ID) %>% 
+  summarise_all(mean) %>% 
+  ungroup() 
 
-# dat2 <- dat %>% select(ExpDay, Treatment, PF_abund, MF_abund, HF_abund) %>% 
-#   group_by(ExpDay,Treatment) %>% 
-#   summarize_all(mean)
-# 
-# dat2$Ror = !is.na(env$Rot)
 
-# models:
+# models -----
 
-# # and then
-# ap.m1 = brm(bf(PF_abund ~ 
-#                 # 0 + 
-#                 Nutr*PAR*ExpDay
-#               + (1|Mes_ID)),
-#            family = gaussian(link = "identity"),
-#            chains = 4,
-#            iter = 2000,
-#            cores = 4,
-#            control = list(adapt_delta = 0.95),
-#            seed = 543,
-#            backend = "cmdstanr", 
-#            data = dat
-# )
-# summary(ap.m1)
-# 
+## background data -----
 abs.m = brm(bf(a420 ~ 
                  + Treatment*ExpDay
                + (1|Mes_ID)),
             family = gaussian(link = "identity"),
-            # family = mix,
             chains = 4,
             iter = 2000,
             cores = 4,
@@ -94,7 +65,6 @@ abs.m = brm(bf(a420 ~
             file = "models/231029_abs",
             file_refit = "on_change"
 )
-
 
 pp_check(abs.m)
 summary(abs.m)
@@ -113,16 +83,11 @@ summary(pDayTr, point = "mean")
 
 
 
-pr <- get_prior(PAR ~ 
-                  + Treatment*ExpDay
-                + (1|Mes_ID), data = env, family = gaussian())
 
 par.m = brm(bf(PAR ~ 
                 + Treatment*ExpDay
               + (1|Mes_ID)),
            family = gaussian(link = "identity"),
-           # family = mix,
-           # prior = pr,
            chains = 4,
            iter = 2000,
            cores = 4,
@@ -133,9 +98,6 @@ par.m = brm(bf(PAR ~
            file = "models/231025_par",
            file_refit = "on_change"
 )
-
-par <- report(par.m)
-as.data.frame(par)
 
 pp_check(par.m)
 summary(par.m)
@@ -152,58 +114,44 @@ summary(emDayTr, point = "mean")
 pDayTr = pairs(emDayTr)
 summary(pDayTr, point = "mean")
 
-par.m %>% 
-  spread_draws(condition_mean[condition]) %>%
-  head(10)
-
-sjPlot::tab_model(par.m, abs.m, nut.m)
-
-# NOT GOOD
-
-dpr <- get_prior(DOC ~ 
-                   + Treatment*ExpDay
-                 + (1|Mes_ID),
-                 family = gaussian(link = "identity"),data = env)
-
-
-doc.m = brm(bf(DOC ~ 
-                + Treatment*ExpDay
-              + (1|Mes_ID)),
-           family = gaussian(link = "identity"),
-           # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
-           chains = 4,
-           iter = 2000,
-           # prior = dpr,
-           cores = 4,
-           control = list(adapt_delta = 0.99, 
-                          max_treedepth = 15),
-           seed = 543,
-           backend = "cmdstanr", 
-           data = env%>% filter(!is.na(DOC)),
-           file = "models/231026_doc",
-           file_refit = "on_change"
-)
-pp_check(doc.m)
-summary(doc.m)
-conditional_effects(doc.m, effects = "Treatment:ExpDay")
-conditional_effects(doc.m, effects = "ExpDay:Treatment")
-
-emTrDay = emmeans(doc.m, ~ Treatment|ExpDay)
-summary(emTrDay, point = "mean")
-pTrDay = pairs(emTrDay)
-summary(pTrDay, point = "mean")
-
-emDayTr = emmeans(doc.m, ~ ExpDay|Treatment)
-summary(emDayTr, point = "mean")
-pDayTr = pairs(emDayTr)
-summary(pDayTr, point = "mean")
+# 
+# doc.m = brm(bf(DOC ~ 
+#                 + Treatment*ExpDay
+#               + (1|Mes_ID)),
+#            family = gaussian(link = "identity"),
+#            # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
+#            chains = 4,
+#            iter = 2000,
+#            # prior = dpr,
+#            cores = 4,
+#            control = list(adapt_delta = 0.99, 
+#                           max_treedepth = 15),
+#            seed = 543,
+#            backend = "cmdstanr", 
+#            data = env%>% filter(!is.na(DOC)),
+#            file = "models/231026_doc",
+#            file_refit = "on_change"
+# )
+# pp_check(doc.m)
+# summary(doc.m)
+# conditional_effects(doc.m, effects = "Treatment:ExpDay")
+# conditional_effects(doc.m, effects = "ExpDay:Treatment")
+# 
+# emTrDay = emmeans(doc.m, ~ Treatment|ExpDay)
+# summary(emTrDay, point = "mean")
+# pTrDay = pairs(emTrDay)
+# summary(pTrDay, point = "mean")
+# 
+# emDayTr = emmeans(doc.m, ~ ExpDay|Treatment)
+# summary(emDayTr, point = "mean")
+# pDayTr = pairs(emDayTr)
+# summary(pDayTr, point = "mean")
 
 
 chla.m <- brm(bf(Chla ~ 
                    + Treatment*ExpDay
                  + (1|Mes_ID)),
               family = gaussian(link = "identity"),
-              # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
               chains = 4,
               iter = 2000,
               cores = 4,
@@ -215,8 +163,8 @@ chla.m <- brm(bf(Chla ~
               data = env %>% filter(!is.na(Chla)),
               file = "models/231204_chla",
               # file = "models/231212_chla",
-              file_refit = "on_change"
-)
+              file_refit = "on_change")
+
 pp_check(chla.m)
 summary(chla.m)
 conditional_effects(chla.m, effects = "Treatment:ExpDay")
@@ -238,7 +186,6 @@ nut.m = brm(bf(Nutr ~
                  + Treatment*ExpDay
                + (1|Mes_ID)),
             family = gaussian(link = "identity"),
-            # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
             chains = 4,
             iter = 2000,
             cores = 4,
@@ -249,8 +196,8 @@ nut.m = brm(bf(Nutr ~
             backend = "cmdstanr", 
             data = env%>% filter(!is.na(Nutr)),
             file = "models/231026_nutr",
-            file_refit = "on_change"
-)
+            file_refit = "on_change")
+
 pp_check(nut.m)
 summary(nut.m)
 conditional_effects(nut.m, effects = "Treatment:ExpDay")
@@ -272,7 +219,6 @@ tn.m = brm(bf(TN ~
                  + Treatment*ExpDay
                + (1|Mes_ID)),
             family = gaussian(link = "identity"),
-            # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
             chains = 4,
             iter = 2000,
             cores = 4,
@@ -281,7 +227,7 @@ tn.m = brm(bf(TN ~
                            step_size = 0.2),
             seed = 543,
             backend = "cmdstanr", 
-            data = env%>% filter(!is.na(TN)),
+            data = env %>% filter(!is.na(TN)),
             file = "models/231120_TN",
             file_refit = "on_change"
 )
@@ -307,7 +253,6 @@ tp.m = brm(bf(TP ~
                 + Treatment*ExpDay
               + (1|Mes_ID)),
            family = gaussian(link = "identity"),
-           # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
            chains = 4,
            iter = 2000,
            cores = 4,
@@ -337,12 +282,11 @@ summary(pTrDay, point = "mean")
 summary(pDayTr, point = "mean")
 
 
-
+## rotifers ----
 rot.m = brm(bf(log1p(Rotif) ~ 
                  + Treatment*ExpDay
                + (1|Mes_ID)),
             family = gaussian(link = "identity"),
-            # family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
             chains = 4,
             iter = 2000,
             cores = 4,
@@ -371,46 +315,9 @@ pDayTr = pairs(emDayTr)
 summary(pTrDay, point = "mean")
 summary(pDayTr, point = "mean")
 
+## abundances ---- 
 
-
-
-zoo.m = brm(bf(log1p(Zoopl) ~
-                 + Treatment*ExpDay
-               + (1|Mes_ID)),
-            family = gaussian(link = "identity"),
-            chains = 4,
-            iter = 2000,
-            cores = 4,
-            control = list(adapt_delta = 0.99,
-                           max_treedepth = 12,
-                           step_size = 0.2),
-            seed = 543,
-            backend = "cmdstanr",
-            data = zoop %>% filter(!is.na(Zoopl)),
-            file = "models/231127_zoopl",
-            # file_refit = "on_change"
-)
-
-pp_check(zoo.m, ndraws = 10)
-summary(zoo.m)
-conditional_effects(zoo.m, effects = "Treatment:ExpDay")
-conditional_effects(zoo.m, effects = "ExpDay:Treatment")
-
-emTrDay = emmeans(zoo.m, ~ Treatment|ExpDay, type = 'response')
-summary(emTrDay, point = "mean")
-pTrDay = pairs(emTrDay)
-
-emDayTr = emmeans(zoo.m, ~ ExpDay|Treatment)
-summary(emDayTr, point = "mean")
-pDayTr = pairs(emDayTr)
-
-summary(pTrDay, point = "mean")
-summary(pDayTr, point = "mean")
-
-# emmeans(zoo.m, pairwise ~ ~ Treatment|ExpDay, regrid = "log", type = 'response')
-
-
-
+# heter. bact
 bact.m = brm(bf(HB_abund ~ 
                + Treatment*ExpDay
              + (ExpDay|Mes_ID)),
@@ -439,6 +346,7 @@ summary(dddd1, point = "mean")
 pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
+# cyanobacteria
 cy.m = brm(bf(CY_abund ~ 
                + Treatment*ExpDay
              + (ExpDay|Mes_ID)),
@@ -467,8 +375,7 @@ summary(dddd1, point = "mean")
 pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
-
-
+# phototrophs
 p.m = brm(bf(PF_abund ~ 
               + Treatment*ExpDay
               + (ExpDay|Mes_ID)),
@@ -497,7 +404,7 @@ summary(dddd, point = "mean")
 pppp1 = pairs(dddd)
 summary(pppp, point = "mean")
 
-
+# heterotrophs
 h.m = brm(bf(HF_abund ~ 
               + Treatment*ExpDay
               + (ExpDay|Mes_ID)),
@@ -526,7 +433,7 @@ summary(dddd1, point = "mean")
 pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
-
+# mixotrophs
 m.m1 = brm(bf(MF_abund ~ 
                + Treatment*ExpDay
              + (ExpDay|Mes_ID)),
@@ -560,10 +467,10 @@ pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
 
-## Ingestion rates
-
+## Rates ----
 #without transformation
 
+# mix ingestion
 mir.m1 = brm(bf(M.Ir ~ 
                + Treatment*ExpDay
              + (ExpDay|Mes_ID)),
@@ -599,7 +506,7 @@ summary(dddd1, point = "mean")
 pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
-
+# het ingestion
 hir.m1 = brm(bf(H.Ir ~ 
                  + Treatment*ExpDay
                + (ExpDay|Mes_ID)),
@@ -631,7 +538,7 @@ summary(dddd1, point = "mean")
 pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
-
+# mix grazing
 mgr.m1 = brm(bf(M.Gr ~ 
                  + Treatment*ExpDay
                + (ExpDay|Mes_ID)),
@@ -660,12 +567,12 @@ summary(dddd1, point = "mean")
 pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
+# het ingestion
 hgr.m1 = brm(bf(H.Gr ~ 
                  + Treatment*ExpDay
                + (ExpDay|Mes_ID)),
             # family = gaussian(link = "identity"),
             family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
-            # family = hurdle_gamma(link = "log"),
             chains = 4,
             iter = 2000,
             cores = 4,
@@ -692,7 +599,7 @@ summary(dddd1, point = "mean")
 pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
-## Sizes =====
+## Sizes -----
 
 ps.m = brm(bf(biovol_PF ~ 
                + Treatment*ExpDay

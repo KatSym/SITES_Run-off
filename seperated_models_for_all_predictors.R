@@ -205,23 +205,26 @@ mgr.pairs = pairs(mgr.emt, level = .9)
 summary(mgr.pairs, point.est = mean, level = .9)
 mgr.em = emmeans (Mgr, pairwise  ~ Treatment | Incubation,
                   at = list(Incubation = c(2, 3)))
-summary(mir.em, point.est = mean, level = .9)
+summary(mgr.em, point.est = mean, level = .9)
 
 Hgr= brm(bf(Gh ~ Treatment 
-               * Incubation
-               + (1|Mesocosm),
-               hu ~ Treatment 
-               + Incubation
-               + (1|Mesocosm)),
-            family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
-            chains = 4,
-            iter = 2000,
-            cores = 4,
-            control = list(adapt_delta=0.95),
-            seed=543,
-            backend = "cmdstanr", 
-            data = gr1,
-            file = "models/Hgr_inc23"
+            * Incubation
+            + (1|Mesocosm),
+            hu ~ Treatment 
+            + Incubation
+            + (1|Mesocosm)),
+         family = hurdle_lognormal(link = "identity", link_sigma = "log", link_hu = "logit"),
+         
+         # family = hurdle_gamma(link = "log", link_shape = "log", link_hu = "logit"),
+         chains = 4,
+         iter = 2000,
+         cores = 4,
+         control = list(adapt_delta=0.95),
+         seed=543,
+         backend = "cmdstanr", 
+         data = gr1,
+         file = "models/Hgr_inc23",
+         file_refit = "on_change"
 )
 pp_check(Hgr, ndraws = 100)
 plot(Hgr, ask = F)
@@ -263,42 +266,36 @@ gr.df %>%
                 y = grrate,
                 colour = Treatment,
                 fill = Treatment)) +
-  geom_point(data = grdatt, 
-             aes(x = Incubation, 
-                 y = grrate, 
-                 colour = Treatment), 
-             # inherit.aes = FALSE, 
-             position = position_jitter(width = .02),
-             alpha = .5) +
-  facet_grid(rows = vars(group),
-             scales = "free_y") +
-  # geom_line(aes(y = .epred, 
-  #               group = paste(Treatment, .draw)), alpha = .2) +
   stat_lineribbon(aes(y = (.epred)),
                   .width = .9,
                   point_interval = mean_qi,
                   size = 1,
-                  alpha = .35,
-                  # fill_ramp(from = trt.cols)
+                  alpha = .7,
   ) +
+  geom_point(data = grdatt, 
+             aes(x = Incubation, 
+                 y = grrate, 
+                 colour = Treatment), 
+             position = position_jitter(width = .02),
+             alpha = .5) +
+  facet_grid(rows = vars(group),
+             scales = "free_y") +
   scale_x_continuous(breaks = c( 2, 3), 
                      labels = c(13, 21),
                      limits = c(2, 3)) +
-  # scale_color_manual(values = trt.cols) +
-  scale_color_manual(values =  c("#000000", "#075f3b", "#30508d", "#8b2b33")) +
-  # scale_color_manual(values =  c("#000000", "#05472c", "#243c6a", "#682026")) +
-  scale_fill_manual(values = c("#b3b3b3", "#54ab87", "#7c9cda", "#f19199")) +
-  # scale_fill_manual(values = c("#5e5e5e", "#54be86","#82a7ff",  "#ff7177")) +  
+  scale_color_manual(values = trt.cols)+
+  scale_fill_manual(values = c("#E5E5E5", "#D6E6E5", "#EBF0F9", "#FCECEE")) +
   theme(panel.grid.minor = element_blank(),
-        # panel.grid.major = element_blank(),
-        panel.background = element_rect(fill = "grey98"),
-        axis.text = element_text(size = 11),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",
+        axis.line = element_line(colour = "black", size = .3),
+        axis.text = element_text(size = 11, colour = "black"),
         axis.title = element_text(size = 11),
-        # axis.text.y = element_text(size = 12),
         strip.text.y = element_text(size = 12)) +
-  labs(y = "Grazing rate Bacteria/hr",
+  labs(y = expression(paste("Grazing rate Bacteria hr" ^{-1})),
        x = "Experimental day") 
-ggsave("Plots/20230522_grazing_rate-1.png", dpi = 300)
+ggsave("Plots/20230601_grazing_rate-1.png", dpi = 300)
 
 
 
