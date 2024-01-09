@@ -32,7 +32,81 @@ ggplot(rotifers, aes(x = as.factor(ExpDay), y = log(abund+1), fill = rotif.sp))+
   geom_bar(width = 0.8, stat = "identity", position = "dodge")+
   facet_wrap(~Treatment)
 
-## Zooplankton from Benny
+rot.meas <- read_xlsx("Data/Erken_zoo_measurements_2016-2019.xlsx", 
+                      sheet = 1, range = "A1:O2023", col_names = T) %>% 
+  select(-c(Site, Comment1, `Dyntaxa ID`, `Analysis method`, `Analysis laboratory`)) %>% 
+  # considering genera and measurements taken only in the summer months
+  mutate(month = substr(as.character(Date), 3, 4)) %>% 
+  filter(month %in% c("06", "07", "08")) %>% 
+  # get the "volume" not biovolume
+  mutate(indv.vol = `Biovol.(µm³/l)`/ `Density(n/l)`) %>% 
+  # keeping only the genus
+  separate(ScientificName, c("Genus", NA), remove = T) %>% 
+  filter(Phylum == "Rotifera") %>% 
+  group_by(Genus) %>% 
+  summarise(indv.vol.m = mean(indv.vol),
+            indv.vol.sd = sd(indv.vol),
+            biovol.m = mean(`Biovol.(µm³/l)`),
+            biovol.sd = sd(`Biovol.(µm³/l)`),
+            length.m = mean(`Mesured length (µm)`),
+            length.sd = sd(`Mesured length (µm)`),
+            FW.m = mean(`Freshweight(mg/l)`),
+            FW.sd = sd(`Freshweight(mg/l)`)) %>% 
+  as.data.frame()
+# rot.meas %>% filter(Genus == "Kellicottia") %>% 
+# ggplot(., aes(x = biovol.m)) +
+#   geom_histogram()
+
+
+# DON'T DO THIS ----
+# get a 150 values from the distribution with mean and sd of each species
+table(rotifers$rotif.sp)
+seed(123)
+Kerat.biov = rnorm(150, 
+      rot.meas[rot.meas$Genus == "Keratella", "biovol.m"], 
+      rot.meas[rot.meas$Genus == "Keratella", "biovol.sd"])
+# we want 96 positive values from each vector
+ker.pos = sample(Kerat.biov[Kerat.biov > 0], 96)
+
+# repeat with the rest
+Aspl.biov = rnorm(150, 
+                   rot.meas[rot.meas$Genus == "Asplanchna", "biovol.m"], 
+                   rot.meas[rot.meas$Genus == "Asplanchna", "biovol.sd"])
+asp.pos = sample(Aspl.biov[Aspl.biov > 0], 96)
+Coln.biov = rnorm(150, 
+                  rot.meas[rot.meas$Genus == "Conochilus", "biovol.m"], 
+                  rot.meas[rot.meas$Genus == "Conochilus", "biovol.sd"])
+cln.pos = sample(Coln.biov[Coln.biov > 0], 96)
+Kellic.biov = rnorm(150, 
+                  rot.meas[rot.meas$Genus == "Kellicottia", "biovol.m"], 
+                  rot.meas[rot.meas$Genus == "Kellicottia", "biovol.sd"])
+kel.pos = sample(Kellic.biov[Kellic.biov > 0], 96)
+
+ro <-  rotifers %>% 
+#   mutate(biov = case_when(rotif.sp == "small" ~ list(ker.pos),
+#                           rotif.sp == "Aspl" ~ list(asp.pos),
+#                           rotif.sp == "coln" ~ list(cln.pos),
+#                           rotif.sp == "Kell" ~ list(kel.pos)))
+mutate(biov = case_when(rotif.sp == "small" ~ sample(Kerat.biov[Kerat.biov > 0], 1),
+                        rotif.sp == "Aspl" ~ sample(Aspl.biov[Aspl.biov > 0],1),
+                        rotif.sp == "coln" ~ sample(Coln.biov[Coln.biov > 0],1),
+                        rotif.sp == "Kell" ~ sample(Kellic.biov[Kellic.biov > 0],1)))
+
+# mean biovolume for each rotifer species ----
+
+rot <-  rotifers %>% 
+  mutate(rot.vol = case_when(rotif.sp == "small" ~ 
+                            rot.meas[rot.meas$Genus == "Keratella", "indv.vol.m"],
+                          rotif.sp == "Aspl" ~ 
+                            rot.meas[rot.meas$Genus == "Asplanchna", "indv.vol.m"],
+                          rotif.sp == "coln" ~ 
+                            rot.meas[rot.meas$Genus == "Conochilus", "indv.vol.m"],
+                          rotif.sp == "Kell" ~ 
+                            rot.meas[rot.meas$Genus == "Kellicottia", "indv.vol.m"]),
+         # biovolume in µm³/l
+         biovol = abund * rot.vol) 
+  
+## Zooplankton from Benny - NOT GOING TO USE
 
 zoopl <- read_xlsx("Data/ZOOPLANKTON_FINAL.xlsx", 
                    sheet = 1, range = "A1:T981", col_names = T) %>% 
@@ -97,28 +171,3 @@ zoop <- full_join(rot1, zoop1, by = c("ExpDay", "Treatment", "Mes_ID")) %>%
   ungroup() 
 
 
-meas <- read_xlsx("Data/Erken_zoo_measurements_2016-2019.xlsx", 
-                  sheet = 1, range = "A1:O2023", col_names = T) %>% 
-  select(-c(Site, Comment1, `Dyntaxa ID`, `Analysis method`, `Analysis laboratory`)) %>% 
-  mutate(month = substr(as.character(Date), 3, 4)) %>% 
-  filter(month %in% c("06", "07", "08")) %>% 
-  # keeping only the genus
-  separate(ScientificName, c("Genus", NA), remove = T)
-
-meas %>% filter(Genus == "Kellicottia") %>% 
-ggplot(., aes(x = `Biovol.(µm³/l)`)) +
-  geom_histogram()
-
-
-
-
-rot.meas <- meas %>% filter(Phylum == "Rotifera") %>% 
-  group_by(Genus) %>% 
-  summarise(biovol.m = mean(`Biovol.(µm³/l)`),
-            biovol.sd = sd(`Biovol.(µm³/l)`),
-            length.m = mean(`Mesured length (µm)`),
-            length.sd = sd(`Mesured length (µm)`),
-            FW.m = mean(`Freshweight(mg/l)`),
-            FW.sd = sd(`Freshweight(mg/l)`))
-
-small.len = rnorm(150, 113.7639, 18.965807)
