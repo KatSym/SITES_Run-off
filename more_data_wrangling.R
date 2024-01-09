@@ -111,15 +111,15 @@ backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
                   header = T) %>% 
   pivot_longer(cols = 2:117, names_to = "varbl", values_to = "val") %>% 
   separate(varbl, into = c("vrbl", "MesID"), sep = "\\.") %>% 
-  filter(TIMESTAMP %in% c("2022-07-07",
-                          "2022-07-08",
-                          "2022-07-11", 
-                          "2022-07-12", 
-                          "2022-07-19",
-                          "2022-07-20", 
-                          "2022-07-27", 
-                          "2022-07-28",
-                          "2022-08-12")) %>% 
+  # filter(TIMESTAMP %in% c("2022-07-07",
+  #                         "2022-07-08",
+  #                         "2022-07-11", 
+  #                         "2022-07-12", 
+  #                         "2022-07-19",
+  #                         "2022-07-20", 
+  #                         "2022-07-27", 
+  #                         "2022-07-28",
+  #                         "2022-08-12")) %>% 
   pivot_wider(id_cols = c("TIMESTAMP", "MesID"), names_from = "vrbl", values_from = "val") %>% 
   select(-contains("lake")) %>% 
   filter(!is.na(MesID)) %>%   
@@ -127,15 +127,29 @@ backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
          DOsat = DOsat_optode,
          Temp = Temp_optode,
          DOconc = DOconc_optode) %>% 
-  mutate(ExpDay = case_when(TIMESTAMP == "2022-07-07" ~ 0,
-                            TIMESTAMP == "2022-07-08" ~ 1,
-                            TIMESTAMP == "2022-07-11" ~ 4,
-                            TIMESTAMP == "2022-07-12" ~ 5,
-                            TIMESTAMP == "2022-07-19" ~ 12,
-                            TIMESTAMP == "2022-07-20" ~ 13,
-                            TIMESTAMP == "2022-07-27" ~ 20,
-                            TIMESTAMP == "2022-07-28" ~ 21,
-                            TIMESTAMP == "2022-08-12" ~ 36),
+  mutate(
+    ExpDay = case_when(TIMESTAMP == "2022-07-07" ~ 0,
+                       TIMESTAMP == "2022-07-08" ~ 1,
+                       TIMESTAMP == "2022-07-09" ~ 2,
+                       TIMESTAMP == "2022-07-10" ~ 3,
+                       TIMESTAMP == "2022-07-11" ~ 4,
+                       TIMESTAMP == "2022-07-12" ~ 5,
+                       TIMESTAMP == "2022-07-13" ~ 6,
+                       TIMESTAMP == "2022-07-14" ~ 7,
+                       TIMESTAMP == "2022-07-15" ~ 8,
+                       TIMESTAMP == "2022-07-16" ~ 9,
+                       TIMESTAMP == "2022-07-17" ~ 10,
+                       TIMESTAMP == "2022-07-18" ~ 11,
+                       TIMESTAMP == "2022-07-19" ~ 12,
+                       TIMESTAMP == "2022-07-20" ~ 13,
+                       TIMESTAMP == "2022-07-21" ~ 14,
+                       TIMESTAMP == "2022-07-22" ~ 15,
+                       TIMESTAMP == "2022-07-23" ~ 16,
+                       TIMESTAMP == "2022-07-24" ~ 17,
+                       TIMESTAMP == "2022-07-25" ~ 18,
+                       TIMESTAMP == "2022-07-26" ~ 19,
+                       TIMESTAMP == "2022-07-27" ~ 20,
+                       TIMESTAMP == "2022-07-28" ~ 21),
          MesID = as.numeric(MesID),
          Treatment = case_when(MesID == 1 | MesID == 7 | MesID == 10 | MesID == 16 ~ "C",
                                MesID == 2 | MesID == 8 | MesID == 11 | MesID == 13 ~ "D",
@@ -275,15 +289,15 @@ nuts <- left_join(Dnut, TP_Chla, by = c("ExpDay", "MesID")) %>%
 
 treatm <- Treats %>%
   ggplot(., aes(x = Experimental_day, y = intensity, fill = Treatment))+
-  geom_bar(stat = "identity", position=position_dodge(), width = .6,
+  geom_bar(stat = "identity", position=position_dodge(.85), width = .7,
            # alpha = .3
            ) +
   scale_fill_manual(values = trt.cols,
                     labels = c("Daily", "Intermediate", "Extreme")) +
   scale_x_continuous(limits = c(0, 22),
                      expand = c(0, 0),
-                     breaks = c(0, 5, 10, 15, 20, 22),
-                     label = c(0, 5, 10, 15, 20, "")) +  
+                     breaks = c(0, 5, 10, 15, 20),
+                     label = c(0, 5, 10, 15, 20)) +  
   scale_y_continuous(expand = c(0, 0),
                      limits = c(0, 110)) +
   geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
@@ -299,6 +313,7 @@ theme(
       axis.title = element_text(size = 13),
       legend.position = "none",
       legend.title = element_blank(),
+      axis.ticks.x = 
       # legend.background = element_rect(fill='transparent'),
       # axis.text.y = element_text(size = 12),
       # strip.text.y = element_text(size = 12),
