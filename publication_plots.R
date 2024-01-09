@@ -7,7 +7,27 @@ library(ggpubr)
 library(grid)
 
 # data
+load("all_data.RData")
 
+mytr <- function(x){
+  log10(x+1)
+}
+
+dat <- data %>% 
+  relocate(c(M.Ir, H.Ir, M.Gr, H.Gr), .after = biovol_MF) %>% 
+  # log(x + 1) transormed
+  mutate(across(4:16, mytr),
+         ExpDay = factor(ExpDay)) 
+
+# take out day 5
+dat1 <- dat %>% filter(ExpDay !="5") %>% droplevels() %>% 
+  mutate(Treatment = as.factor(Treatment))
+
+Treats <- read_xlsx("Data/SITES_experiment_planning.xlsx",
+                    sheet = "Treatments",
+                    range = "A1:D21", 
+                    col_names = T) %>% 
+  pivot_longer(cols = c("E", "I", "D"), names_to = "Treatment", values_to = "intensity")
 
 
 # Same dataframe with the one that was used in the models, but here ExpDay is
@@ -15,8 +35,6 @@ library(grid)
 nutr = envir %>% 
   select(-c(TOC, DN, DOsat, DOconc)) %>% 
   relocate(c(ExpDay, Treatment), .before = Mes_ID)
-
-
 
 # general theme
 matheme <- theme(
@@ -63,7 +81,30 @@ leg.h <- ggplot(dat, aes(x = ExpDay, y = PF_abund, color = Treatment))+
 ## Fig. 1 - background data ====
 
 # treatment additions
-
+treatm <- Treats %>%
+  ggplot(., aes(x = Experimental_day, y = intensity, fill = Treatment))+
+  geom_bar(stat = "identity", position=position_dodge(.85), width = .7,
+           # alpha = .3
+  ) +
+  scale_fill_manual(values = trt.cols,
+                    labels = c("Daily", "Intermediate", "Extreme")) +
+  scale_x_continuous(limits = c(0, 22),
+                     expand = c(0, 0),
+                     breaks = c(0, 5, 10, 15, 20),
+                     label = c(0, 5, 10, 15, 20)) +  
+  scale_y_continuous(expand = c(0, 0),
+                     limits = c(0, 110)) +
+  geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+  geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+  geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
+  labs(y = "Addition %",
+       x = NULL) +
+  matheme+
+  theme(
+    axis.title = element_text(size = 13),
+    legend.position = "none",
+    legend.title = element_blank())
+ggsave("Plots/20231102_treatments.png", dpi = 300)
 
 
 # models
@@ -73,10 +114,6 @@ abs.m <-  brm(file = "models/231029_abs")
 chla.m <- brm(file = "models/231204_chla")
 tn.m <-  brm(file = "models/231120_TN")
 tp.m <-  brm(file = "models/231120_TP")
-
-
-
-
 
 
 
@@ -732,7 +769,7 @@ hgr <- dat1 %>%
     scale_fill_manual(values = trt.cols)+
     matheme+
     labs(y = NULL,
-         x = NULL))
+         x = NULL)
 
 p3 <- ggarrange(mir, hir, mgr, hgr, 
                 ncol = 2, nrow = 2,
