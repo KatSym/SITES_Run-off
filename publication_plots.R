@@ -1,7 +1,6 @@
 library(tidyverse)
 library(brms)
 library(tidybayes)
-library(modelr) #?
 library(emmeans)
 library(ggpubr)
 library(grid)
@@ -14,7 +13,7 @@ mytr <- function(x){
 }
 
 dat <- data %>% 
-  relocate(c(M.Ir, H.Ir, M.Gr, H.Gr), .after = biovol_MF) %>% 
+  relocate(c(MF_Ir, HF_Ir, MF_Gr, HF_Gr), .after = biovol_MF) %>% 
   # log(x + 1) transormed
   mutate(across(4:16, mytr),
          ExpDay = factor(ExpDay)) 
@@ -648,7 +647,7 @@ mir <- dat1 %>%
                    re_formula = NA,
    ) %>% 
    ggplot(., aes(x = ExpDay,
-                 y = M.Ir,
+                 y = MF_Ir,
                  colour = Treatment,
    )) +
    stat_pointinterval(aes(y = (.epred)),
@@ -659,7 +658,7 @@ mir <- dat1 %>%
    geom_point(
      data = dat1,
      aes(x = ExpDay,
-         y = M.Ir,
+         y = MF_Ir,
          colour = Treatment),
      inherit.aes = FALSE,
      position = position_jitterdodge(dodge.width = .5),
@@ -684,7 +683,7 @@ mgr <- dat1 %>%
                     re_formula = NA,
     ) %>% 
     ggplot(., aes(x = ExpDay,
-                  y = M.Gr,
+                  y = MF_Gr,
                   colour = Treatment,
     )) +
     stat_pointinterval(aes(y = (.epred)),
@@ -695,7 +694,7 @@ mgr <- dat1 %>%
     geom_point(
       data = dat1,
       aes(x = ExpDay,
-          y = M.Gr,
+          y = MF_Gr,
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
@@ -718,7 +717,7 @@ hir <- dat1 %>%
                     re_formula = NA,
     ) %>% 
     ggplot(., aes(x = ExpDay,
-                  y = H.Ir,
+                  y = HF_Ir,
                   colour = Treatment,
     )) +
     stat_pointinterval(aes(y = (.epred)),
@@ -729,7 +728,7 @@ hir <- dat1 %>%
     geom_point(
       data = dat1,
       aes(x = ExpDay,
-          y = H.Ir,
+          y = HF_Ir,
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
@@ -749,7 +748,7 @@ hgr <- dat1 %>%
                     re_formula = NA,
     ) %>% 
     ggplot(., aes(x = ExpDay,
-                  y = H.Gr,
+                  y = HF_Gr,
                   colour = Treatment,
     )) +
     stat_pointinterval(aes(y = (.epred)),
@@ -760,7 +759,7 @@ hgr <- dat1 %>%
     geom_point(
       data = dat1,
       aes(x = ExpDay,
-          y = H.Gr,
+          y = HF_Gr,
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
