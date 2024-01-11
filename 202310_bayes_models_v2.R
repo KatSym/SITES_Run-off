@@ -31,7 +31,7 @@ env <- envir %>%
                 ExpDay = factor(ExpDay))
   
 dat <- data %>% 
-  relocate(c(M.Ir, H.Ir, M.Gr, H.Gr), .after = biovol_MF) %>% 
+  relocate(c(MF_Ir, HF_Ir, MF_Gr, HF_Gr), .after = biovol_MF) %>% 
   # log(x + 1) transormed
     mutate(across(4:16, mytr),
            ExpDay = factor(ExpDay)) 
@@ -471,7 +471,7 @@ summary(pppp1, point = "mean")
 #without transformation
 
 # mix ingestion
-mir.m1 = brm(bf(M.Ir ~ 
+mir.m1 = brm(bf(MF_Ir ~ 
                + Treatment*ExpDay
              + (ExpDay|Mes_ID)),
           # family = gaussian(link = "identity"),
@@ -507,7 +507,7 @@ pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
 # het ingestion
-hir.m1 = brm(bf(H.Ir ~ 
+hir.m1 = brm(bf(HF_Ir ~ 
                  + Treatment*ExpDay
                + (ExpDay|Mes_ID)),
             # family = gaussian(link = "identity"),
@@ -539,7 +539,7 @@ pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
 # mix grazing
-mgr.m1 = brm(bf(M.Gr ~ 
+mgr.m1 = brm(bf(MF_Gr ~ 
                  + Treatment*ExpDay
                + (ExpDay|Mes_ID)),
             # family = gaussian(link = "identity"),
@@ -568,7 +568,7 @@ pppp1 = pairs(dddd1)
 summary(pppp1, point = "mean")
 
 # het ingestion
-hgr.m1 = brm(bf(H.Gr ~ 
+hgr.m1 = brm(bf(HF_Gr ~ 
                  + Treatment*ExpDay
                + (ExpDay|Mes_ID)),
             # family = gaussian(link = "identity"),
@@ -1311,7 +1311,7 @@ env %>%
                    re_formula = NA,
    ) %>% 
    ggplot(., aes(x = ExpDay,
-                 y = M.Ir,
+                 y = MF_Ir,
                  colour = Treatment,
    )) +
    stat_pointinterval(aes(y = (.epred)),
@@ -1323,7 +1323,7 @@ env %>%
    geom_point(
      data = dat1,
      aes(x = ExpDay,
-         y = M.Ir,
+         y = MF_Ir,
          colour = Treatment),
      inherit.aes = FALSE,
      position = position_jitterdodge(dodge.width = .5),
@@ -1349,7 +1349,7 @@ env %>%
                     re_formula = NA,
     ) %>% 
     ggplot(., aes(x = ExpDay,
-                  y = M.Gr,
+                  y = MF_Gr,
                   colour = Treatment,
     )) +
     stat_pointinterval(aes(y = (.epred)),
@@ -1361,7 +1361,7 @@ env %>%
     geom_point(
       data = dat1,
       aes(x = ExpDay,
-          y = M.Gr,
+          y = MF_Gr,
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
@@ -1385,7 +1385,7 @@ env %>%
                     re_formula = NA,
     ) %>% 
     ggplot(., aes(x = ExpDay,
-                  y = H.Ir,
+                  y = HF_Ir,
                   colour = Treatment,
     )) +
     stat_pointinterval(aes(y = (.epred)),
@@ -1397,7 +1397,7 @@ env %>%
     geom_point(
       data = dat1,
       aes(x = ExpDay,
-          y = H.Ir,
+          y = HF_Ir,
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
@@ -1418,7 +1418,7 @@ env %>%
                     re_formula = NA,
     ) %>% 
     ggplot(., aes(x = ExpDay,
-                  y = H.Gr,
+                  y = HF_Gr,
                   colour = Treatment,
     )) +
     stat_pointinterval(aes(y = (.epred)),
@@ -1430,7 +1430,7 @@ env %>%
     geom_point(
       data = dat1,
       aes(x = ExpDay,
-          y = H.Gr,
+          y = HF_Gr,
           colour = Treatment),
       inherit.aes = FALSE,
       position = position_jitterdodge(dodge.width = .5),
