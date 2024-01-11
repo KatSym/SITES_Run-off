@@ -76,6 +76,14 @@ leg.h <- ggplot(dat, aes(x = ExpDay, y = PF_abund, color = Treatment))+
   )+
   guides(colour = guide_legend(override.aes = list(size=4))) # or 4
 
+#colours
+trt.cols <- c(`C`= "#000000", #black - C
+              `D`= "#0a8754", #g - D
+              `I`= "#4472ca", #blu - I
+              `E`= "#e84855") #r - E
+
+
+
 
 ## Fig. 1 - background data ====
 
