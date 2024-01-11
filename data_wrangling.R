@@ -150,7 +150,7 @@ bdat <- dat %>%
   mutate(GROUP = substring(agroup, 2, 3))  %>%
   inner_join(., sz.data, by = c("Incubation", "Treatment", "GROUP")) %>%
   mutate(biovol = abundance *mean.cell.vol,
-    biomass = abundance * (0.216*mean.cell.vol^0.939)) %>%  # Menden-Deuer Lessard 2000, pgC/mL
+         biomass = abundance * (0.216*mean.cell.vol^0.939)) %>%  # Menden-Deuer Lessard 2000, pgC/mL
   select(Incubation, Treatment, Mes_ID, Replicate, GROUP, biomass, biovol) %>%
   pivot_wider(names_from = GROUP, values_from =c(biomass, biovol), values_fn = mean)
 
@@ -179,7 +179,7 @@ GR1 <- IR1 %>%
   mutate(
     Gm = MFir*HB_abund/FLB_abund,
     Gh = HFir*HB_abund/FLB_abund) %>% 
-  select(-contains(c("cells", "Tstart")), -Sample, -Time_point, -Date) 
+  select(-contains(c("cells", "Tstart")), -Sample, -Time_point, -Date, -FLB_abund) 
 GR1[sapply(GR1, is.infinite)] <- 0
 GR1[sapply(GR1, is.nan)] <- 0
 GR1$Gh[GR1$Gh<0] <- 0
@@ -305,17 +305,17 @@ rotifers <- read_xlsx("Data/rotifers_volvoxes.xlsx",
   filter(mesocosm!="LE") %>% 
   mutate(
     # taking rotifer colonies as 1 individual, per L
-    Rotif = 1000*(`small rotifers`+ asplanchna + kellicottia + `rotifer colony`)/vol,
-        # small rotifers are probably Keratella
+    total = 1000*(`small rotifers`+ asplanchna + kellicottia + `rotifer colony`)/vol,
+    # small rotifers are probably Keratella
     small = 1000*`small rotifers`/vol,
-        # rotifer colonies are probably Conochilus 
+    # rotifer colonies are probably Conochilus 
     coln = 1000*`rotifer colony`/vol,
     Kell = 1000*kellicottia/vol,
     Aspl = 1000*asplanchna/vol,
     Mes_ID = as.numeric(mesocosm)) %>%  
   pivot_longer(cols = c(small, coln, Kell, Aspl), 
                names_to = "rotif.sp", values_to = "abund") %>% 
-  select(ExpDay, Treatment, Mes_ID, rotif.sp, abund, Rotif)
+  select(ExpDay, Treatment, Mes_ID, rotif.sp, abund)
 
 
 rot.meas <- read_xlsx("Data/Erken_zoo_measurements_2016-2019.xlsx", 
@@ -367,7 +367,6 @@ envir <- full_join(Dnut, TP_Chla, by = c("Mes_ID", "ExpDay")) %>%
                                Mes_ID == 4 | Mes_ID == 6 | Mes_ID == 9 | Mes_ID == 15 ~ "E"),
          suva = (A254_1/DOC)*100) %>% # L/mg*m
   select(-contains("id", ignore.case = F), -contains("Date"), -Day, -TIMESTAMP, -Mesocosm) %>% 
-  left_join(., rotifers, by = c("ExpDay", "Treatment", "Mes_ID")) %>% 
   filter(!is.na(Mes_ID)) %>% 
   arrange(ExpDay) %>% 
   # keep only relevant mesocosms and time period
@@ -375,28 +374,28 @@ envir <- full_join(Dnut, TP_Chla, by = c("Mes_ID", "ExpDay")) %>%
          ExpDay<=21) %>% 
   select(-c(A254_5, A420_5, A254_1, A420_1, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy, Temp)) %>% 
   as.data.frame()
-  #### NOTE! The env data don't match with my data on experimental day. They are a day before,
-  #### so change it to be the same depending on the analysis
-  ## mutate(ExpDay = case_when(ExpDay == 4 ~ 5,
-  ##                           ExpDay == 12 ~ 13,
-  ##                           ExpDay == 20 ~ 21)) %>% 
-  ## filter(!is.na(ExpDay)) %>% 
-  
+#### NOTE! The env data don't match with my data on experimental day. They are a day before,
+#### so change it to be the same depending on the analysis
+## mutate(ExpDay = case_when(ExpDay == 4 ~ 5,
+##                           ExpDay == 12 ~ 13,
+##                           ExpDay == 20 ~ 21)) %>% 
+## filter(!is.na(ExpDay))  
+
 data = dat %>% 
   mutate(ExpDay = case_when(Incubation == 1 ~ 5,
                             Incubation == 2 ~ 13,
                             Incubation == 3 ~ 21)) %>% 
   left_join(., GR1, by = c("Incubation", "Treatment", "Mes_ID", "Replicate")) %>% 
   left_join(., bdat, by = c("Incubation", "Treatment", "Mes_ID", "Replicate")) %>% 
-  select(-contains(".x"), -contains("Tend"), -contains("corr"), -id, -Sample) %>% 
+  select(-contains(".x"), -contains("Tend"), -contains("corr"), -contains("biomass"), -id, -Sample) %>% 
   mutate(Mes_ID = as.numeric(as.character(Mes_ID))) %>%
-  rename(M.Ir = MFir.y,
-         H.Ir = HFir.y, 
+  rename(MF_Ir = MFir.y,
+         HF_Ir = HFir.y, 
          PF_abund = aPF,
          HF_abund = aHF,
          MF_abund = aMFc,
-         M.Gr = Gm,
-         H.Gr = Gh,
+         MF_Gr = Gm,
+         HF_Gr = Gh,
          Mesocosm = Mesocosm.y) %>% 
   as.data.frame() %>% 
   select(-contains(".y"), -c(MF, aMF, PF, HF, Replicate, Incubation, Mesocosm)) %>% 
@@ -406,3 +405,6 @@ data = dat %>%
 save(data, envir, rot, trt.cols, file = "all_data.RData")
 
 # write csvs
+write.csv(data, "Data/microscope_data_topub.csv", row.names = F)
+write.csv(envir, "Data/envir_data_topub.csv", row.names = F)
+write.csv(rot, "Data/rotifer_data_topub.csv", row.names = F)
