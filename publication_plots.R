@@ -1,4 +1,5 @@
 library(tidyverse)
+library(readxl)
 library(brms)
 library(tidybayes)
 library(emmeans)
@@ -15,7 +16,7 @@ mytr <- function(x){
 dat <- data %>% 
   relocate(c(MF_Ir, HF_Ir, MF_Gr, HF_Gr), .after = biovol_MF) %>% 
   # log(x + 1) transormed
-  mutate(across(4:16, mytr),
+  mutate(across(4:12, mytr),
          ExpDay = factor(ExpDay)) 
 
 # take out day 5
@@ -42,8 +43,8 @@ matheme <- theme(
   panel.grid.major = element_blank(),
   panel.background = element_blank(),
   axis.line = element_line(colour = "black", linewidth = .3),
-  axis.text = element_text(size = 11, colour = "black"),
-  axis.title = element_text(size = 13),
+  axis.text = element_text(size = 13, colour = "black"),
+  axis.title = element_text(size = 15),
   # axis.text.y = element_text(size = 12),
   # strip.text.y = element_text(size = 12)
 ) 
@@ -52,29 +53,36 @@ matheme <- theme(
 leg.v <- ggplot(dat, aes(x = ExpDay, y = PF_abund, color = Treatment))+
   geom_point()+
   lims(y = c(0,0))+
-  scale_color_manual(values = trt.cols)+
+  scale_color_manual(values = trt.cols,
+                     labels = c("Control", "Daily", "Intermittent", "Extreme"))+
   theme_void()+
   theme(legend.position = c(0.5,0.5),
-        legend.text = element_text(size =  11),
+        legend.text = element_text(size =  13),
         legend.background	= element_blank(),
         legend.key	= element_blank(),
-        legend.title = element_blank()
-  )+
+        legend.title = element_blank())+
   guides(colour = guide_legend(override.aes = list(size=4))) # or 4
 
 leg.h <- ggplot(dat, aes(x = ExpDay, y = PF_abund, color = Treatment))+
   geom_point()+
   lims(y = c(0,0))+
-  scale_color_manual(values = trt.cols)+
+  scale_color_manual(values = trt.cols,
+                     labels = c("Control", "Daily", "Intermittent", "Extreme"))+
   theme_void()+
   theme(legend.position = c(0.5,0.5),
-        legend.text = element_text(size =  11),
+        legend.text = element_text(size =  13,
+          margin = margin(r = 30, unit = "pt")),
+        legend.margin=margin(b = 0.6, unit='cm'),
         legend.direction = "horizontal",
         legend.background	= element_blank(),
         legend.key	= element_blank(),
-        legend.title = element_blank()
-  )+
-  guides(colour = guide_legend(override.aes = list(size=4))) # or 4
+        legend.title = element_blank())+
+  guides(colour = guide_legend(override.aes = list(size=4)))# or 4
+
+# make a two-line horizontal legend
+leg.h2 <- leg.h +
+  guides(colour = guide_legend(ncol=2, nrow=2, byrow=TRUE, override.aes = list(size=4)))
+
 
 #colours
 trt.cols <- c(`C`= "#000000", #black - C
@@ -108,10 +116,10 @@ treatm <- Treats %>%
        x = NULL) +
   matheme+
   theme(
-    axis.title = element_text(size = 13),
+    axis.title = element_text(size = 15),
     legend.position = "none",
     legend.title = element_blank())
-ggsave("Plots/20231102_treatments.png", dpi = 300)
+# ggsave("Plots/20231102_treatments.png", dpi = 300)
 
 
 # models
@@ -151,8 +159,8 @@ par.pl <- nutr %>%
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
-  labs(y = "<span style='font-size: 13pt'>PAR</span>
-         <span style='font-size: 11pt'>(μmol m\u207b\u00b2 s\u207b\u00b9)</span>",
+  labs(y = "<span style='font-size: 15pt'>PAR</span>
+         <span style='font-size: 12pt'>(μmol m\u207b\u00b2 s\u207b\u00b9)</span>",
        x = "Experimental day")
 
 
@@ -182,8 +190,8 @@ abs.pl <- nutr %>%
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
-  labs(y = "<span style='font-size: 13pt'>Abs<sub>420</sub></span>
-         <span style='font-size: 11pt'>(m\u207b\u00b9)</span>",
+  labs(y = "<span style='font-size: 15pt'>Abs<sub>420</sub></span>
+         <span style='font-size: 12pt'>(m\u207b\u00b9)</span>",
        x = "Experimental day")
 
 
@@ -213,8 +221,8 @@ tn.pl <- nutr %>%
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
-  labs(y = "<span style='font-size: 13pt'>Total&nbsp;nitrogen</span>
-         <span style='font-size: 11pt'>(mg L\u207b\u00b9)</span>",
+  labs(y = "<span style='font-size: 15pt'>Total&nbsp;nitrogen</span>
+         <span style='font-size: 12pt'>(mg L\u207b\u00b9)</span>",
        x = NULL)
 
 
@@ -243,8 +251,8 @@ tp.pl <- nutr %>%
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
-  labs(y = "<span style='font-size: 13pt'>Total  phosphorus</span>
-         <span style='font-size: 11pt'>(\u00b5g L\u207b\u00b9)</span>",
+  labs(y = "<span style='font-size: 15pt'>Total  phosphorus</span>
+         <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
        x = NULL)
 
 
@@ -273,24 +281,24 @@ chla.pl <- nutr %>%
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
-  labs(y = "<span style='font-size: 13pt'>Chl <i>a</i></span>
-         <span style='font-size: 11pt'>(mg L\u207b\u00b9)</span>",
+  labs(y = "<span style='font-size: 15pt'>Chl <i>a</i></span>
+         <span style='font-size: 12pt'>(mg L\u207b\u00b9)</span>",
        x = NULL)
 
 
 p.bckg <- ggarrange(treatm, par.pl + rremove("xlab"), abs.pl + rremove("xlab"),  
                     tn.pl, tp.pl, chla.pl, 
                     ncol = 3, nrow = 2, align = "hv",
-                    labels = "auto"
-                    # common.legend = T, legend.grob = leg.v, legend = "right"
+                    labels = "auto", font.label = list(size = 15),
+                    common.legend = T, legend.grob = get_legend(leg.h), legend = "top"
 ) 
 
 p.bckg <- annotate_figure(p.bckg, 
-                          bottom = textGrob("Experimental day", gp = gpar(fontsize = 13)))
+                          bottom = textGrob("Experimental day", gp = gpar(fontsize = 15)))
 
 p.bckg
 
-ggsave("Plots/Dec2023/background_1812.png", dpi = 300, bg = "white")
+ggsave("Plots/Jan2024/background_1812.png", dpi = 300, bg = "white", width = 13)
 
 
 
@@ -326,13 +334,13 @@ bact <- dat %>%
       alpha = .35) +
     scale_color_manual(values = trt.cols)+
     labs(title = "Heterotrophic bacteria",
-         y = "<span style='font-size: 13pt'>Abundance </span>
-         <span style='font-size: 11pt'>log(x+1) cells mL\u207b\u00b9</span>",
+         y = "<span style='font-size: 15pt'>Abundance </span>
+         <span style='font-size: 13pt'>log(x+1) cells mL\u207b\u00b9</span>",
          x = "Experimental Day") +
     matheme +
     theme(axis.title.y = ggtext::element_markdown(),
-          axis.title.x = element_text(size = 13),
-          plot.title = element_text(size=13, face="italic")
+          axis.title.x = element_text(size = 15),
+          plot.title = element_text(size=16, face="italic")
     ) 
 
 # cyanobacteria
@@ -360,35 +368,24 @@ cyan <- dat %>%
       alpha = .4) +
     scale_color_manual(values = trt.cols)+
     labs(title = "Cyanobacteria",
-         y = "<span style='font-size: 13pt'>Abundance </span>
-         <span style='font-size: 11pt'>log(x+1) cells mL\u207b\u00b9</span>",
+         y = "<span style='font-size: 15pt'>Abundance </span>
+         <span style='font-size: 13pt'>log(x+1) cells mL\u207b\u00b9</span>",
          x = NULL) +
     matheme +
     theme( axis.title.y = ggtext::element_markdown(),
-           axis.title.x = element_text(size = 13),
-           plot.title = element_text(size=13, face="italic")
+           axis.title.x = element_text(size = 15),
+           plot.title = element_text(size=16, face="italic")
     ) 
 
 
-p2 <- ggarrange(bact, cyan + rremove("ylab"), align = "h",
-                labels = "auto"
-                # , common.legend = T, legend.grob = get_legend(leg.v), legend = "right"
-)
-
-p2.an <- annotate_figure(p2, 
-                         bottom = textGrob("Experimental day", 
-                                           gp = gpar(fontsize = 13)))
-p2.h <- ggarrange(p2.an, leg.h, ncol = 1, align = "h", heights = c(3, 0.2))
-
 p2.1 <- ggarrange(cyan,  bact,
                   ncol = 1, align = "v",
-                  labels = "auto"
-                  # , common.legend = T, legend.grob = get_legend(leg.h), legend = "bottom"
+                  labels = "auto", font.label = list(size = 15),
+                  common.legend = T, legend.grob = get_legend(leg.h2), legend = "top"
 )
 
 
-
-ggsave("Plots/Dec2023/bact-V_20231218-noleg.tiff", p2.1, dpi=300, bg = "white")
+ggsave("Plots/Jan2024/bact.tiff", p2.1, dpi=300, bg = "white")
 
 
 ## Fig. 3 - nanoflagellate abundance and bovolume ----
@@ -414,7 +411,7 @@ phot <- dat %>%
   )) +
   stat_pointinterval(aes(y = (.epred)),
                      .width = c(0.95),
-                     position = position_dodge(.5)
+                     position = position_dodge(.5),
                      linewidth = 2, 
                      show.legend = FALSE
   ) +
@@ -431,13 +428,13 @@ phot <- dat %>%
   scale_color_manual(values = trt.cols) +
   scale_fill_manual(values = trt.cols) +
   labs(title = "Phototroph",
-       y = "<span style='font-size: 13pt'>Abundance </span>
-         <span style='font-size: 11pt'>log(x+1) cells mL\u207b\u00b9</span>",
+       y = "<span style='font-size: 15pt'>Abundance </span>
+         <span style='font-size: 13pt'>log(x+1) cells mL\u207b\u00b9</span>",
        x = NULL)+
   matheme +
   theme(axis.title.y = ggtext::element_markdown(),
-        axis.title.x = element_text(size = 13),
-        plot.title = element_text(size=13, face="italic")
+        axis.title.x = element_text(size = 15),
+        plot.title = element_text(size=16, face="italic")
   ) 
 
 
@@ -453,7 +450,7 @@ het <- dat %>%
   )) +
   stat_pointinterval(aes(y = (.epred)),
                      .width = c(0.95),
-                     position = position_dodge(.5)
+                     position = position_dodge(.5),
                      linewidth = 2
   )+
   geom_point(
@@ -467,13 +464,13 @@ het <- dat %>%
   scale_color_manual(values = trt.cols)+
   scale_fill_manual(values = trt.cols)+
   labs(title = "Heterotroph", 
-       y = "<span style='font-size: 13pt'>Abundance </span>
-         <span style='font-size: 11pt'>Log(x+1) cells mL\u207b\u00b9</span>",
+       y = "<span style='font-size: 15pt'>Abundance </span>
+         <span style='font-size: 13pt'>Log(x+1) cells mL\u207b\u00b9</span>",
        x = NULL)+
   matheme +
   theme(axis.title.y = ggtext::element_markdown(),
-        axis.title.x = element_text(size = 13),
-        plot.title = element_text(size=13, face="italic")
+        axis.title.x = element_text(size = 15),
+        plot.title = element_text(size=16, face="italic")
   ) 
 
 
@@ -504,13 +501,13 @@ mix1 <- dat1 %>%
   scale_x_discrete(breaks = c("5", "13", "21"),
                    limits = c("5", "13", "21"))+
   labs(title = "Mixotroph",
-       y = "<span style='font-size: 13pt'>Abundance </span>
-         <span style='font-size: 11pt'>Log(x+1) cells mL\u207b\u00b9</span>",
+       y = "<span style='font-size: 15pt'>Abundance </span>
+         <span style='font-size: 13pt'>Log(x+1) cells mL\u207b\u00b9</span>",
        x = NULL) +
   matheme +
   theme(axis.title.y = ggtext::element_markdown(),
-        axis.title.x = element_text(size = 13),
-        plot.title = element_text(size=13, face="italic")
+        axis.title.x = element_text(size = 15),
+        plot.title = element_text(size=16, face="italic")
   ) 
 
 # biovolumes
@@ -539,13 +536,13 @@ phot.vol <- dat %>%
     alpha = .4) +
   scale_color_manual(values = trt.cols)+
   scale_fill_manual(values = trt.cols)+
-  labs( y = "<span style='font-size: 13pt'>Biovolume </span>
-         <span style='font-size: 11pt'>log(x+1) &nbsp;  \u00b5m\u00b3 mL\u207b\u00b9</span>",
+  labs( y = "<span style='font-size: 15pt'>Biovolume </span>
+         <span style='font-size: 13pt'>log(x+1) &nbsp;  \u00b5m\u00b3 mL\u207b\u00b9</span>",
     x = NULL)+
   matheme +
   theme(axis.title.y = ggtext::element_markdown(),
-        axis.title.x = element_text(size = 13),
-        plot.title = element_text(size=13, face="italic")
+        axis.title.x = element_text(size = 15),
+        plot.title = element_text(size=16, face="italic")
   ) 
 
 
@@ -575,13 +572,13 @@ het.vol <- dat %>%
   scale_color_manual(values = trt.cols)+
   scale_fill_manual(values = trt.cols)+
   labs(
-    y = "<span style='font-size: 13pt'>Biovolume </span>
-         <span style='font-size: 11pt'>log(x+1) &nbsp;  \u00b5m\u00b3 mL\u207b\u00b9</span>",
+    y = "<span style='font-size: 15pt'>Biovolume </span>
+         <span style='font-size: 13pt'>log(x+1) &nbsp;  \u00b5m\u00b3 mL\u207b\u00b9</span>",
     x = NULL)+
   matheme +
   theme(axis.title.y = ggtext::element_markdown(),
-        axis.title.x = element_text(size = 13),
-        plot.title = element_text(size=13, face="italic")
+        axis.title.x = element_text(size = 15),
+        plot.title = element_text(size=16, face="italic")
   ) 
 
 
@@ -611,13 +608,13 @@ mix.vol1 <- dat1 %>%
   scale_x_discrete(breaks = c("5", "13", "21"),
                    limits = c("5", "13", "21"))+
   labs(
-    y = "<span style='font-size: 13pt'>Biovolume </span>
-         <span style='font-size: 11pt'>log(x+1) &nbsp;  \u00b5m\u00b3 mL\u207b\u00b9</span>",
+    y = "<span style='font-size: 15pt'>Biovolume </span>
+         <span style='font-size: 13pt'>log(x+1) &nbsp;  \u00b5m\u00b3 mL\u207b\u00b9</span>",
     x = NULL)+
   matheme +
   theme(axis.title.y = ggtext::element_markdown(),
-        axis.title.x = element_text(size = 13),
-        plot.title = element_text(size=13, face="italic")
+        axis.title.x = element_text(size = 15),
+        plot.title = element_text(size=16, face="italic")
   ) 
 
 # combined abundance and biovolume
@@ -628,18 +625,18 @@ p5 <- ggarrange(phot,
                 mix.vol1 + rremove("ylab"), 
                 het.vol + rremove("ylab"), 
                 ncol = 3, nrow = 2, align = "hv"
-                # , common.legend = T, legend.grob = get_legend(leg.v), legend = "right"
-                , labels = "auto"
+                , labels = "auto", font.label = list(size = 15)
+                , common.legend = T, legend.grob = get_legend(leg.h), legend = "top"
 )
 
 p5.an <- annotate_figure(p5, 
                          bottom = textGrob("Experimental day", 
-                                           gp = gpar(fontsize = 13)))
+                                           gp = gpar(fontsize = 15)))
 
-p5.h <- ggarrange(p5.an, leg.h, ncol = 1, align = "h", heights = c(3, 0.2))
+# p5.h <- ggarrange(p5.an, leg.h, ncol = 1, align = "h", heights = c(3, 0.2))
 
 
-ggsave("Plots/Dec2023/abund-biov_20231219-noleg.png", p5.an,  dpi=300, bg = "white") 
+ggsave("Plots/Jan2024/abund-biov_20240112.png", p5.an,  dpi=300, bg = "white", width = 13) 
 
 ## Fig. 4 - ingestion and grazing rates =====
 
@@ -675,14 +672,14 @@ mir <- dat1 %>%
    scale_fill_manual(values = trt.cols)+
    labs(
      title = "Mixotroph",
-     y ="<span style='font-size: 13pt'>Ingestion rate</span>
-      <span style='font-size: 11pt'>(FLB cell\u207b\u00b9 h\u207b\u00b9)</span>",
+     y ="<span style='font-size: 15pt'>Ingestion rate</span>
+      <span style='font-size: 13pt'>(FLB cell\u207b\u00b9 h\u207b\u00b9)</span>",
      x = NULL)+
    matheme+
    theme(
      axis.title.y = ggtext::element_markdown(),
-     axis.title.x = element_text(size = 13),
-     plot.title = element_text(size=13, face="italic"))
+     axis.title.x = element_text(size = 15),
+     plot.title = element_text(size=16, face="italic"))
 
 
 mgr <- dat1 %>% 
@@ -710,13 +707,13 @@ mgr <- dat1 %>%
     scale_color_manual(values = trt.cols)+
     scale_fill_manual(values = trt.cols)+
     labs(
-      y ="<span style='font-size: 13pt'>Grazing rate</span>
-         <span style='font-size: 11pt'>(bacteria cell\u207b\u00b9 h\u207b\u00b9)</span>",
+      y ="<span style='font-size: 15pt'>Grazing rate</span>
+         <span style='font-size: 13pt'>(bacteria cell\u207b\u00b9 h\u207b\u00b9)</span>",
       x = NULL)+
     matheme+
     theme(
       axis.title.y = ggtext::element_markdown(),
-      axis.title.x = element_text(size = 13))
+      axis.title.x = element_text(size = 15))
 
 
 hir <- dat1 %>% 
@@ -747,7 +744,7 @@ hir <- dat1 %>%
          y = NULL,
          x = NULL)+
     matheme+
-    theme(plot.title = element_text(size=13, face="italic"))
+    theme(plot.title = element_text(size=16, face="italic"))
 
 
 hgr <- dat1 %>% 
@@ -781,15 +778,14 @@ hgr <- dat1 %>%
 p3 <- ggarrange(mir, hir, mgr, hgr, 
                 ncol = 2, nrow = 2,
                 align = "hv",
-                labels = "auto"
-                # , common.legend = T, legend.grob = get_legend(leg.v), legend = "right"
+                labels = "auto", font.label = list(size = 15)
+                , common.legend = T, legend.grob = get_legend(leg.h), legend = "top"
 )
 p3.an <- annotate_figure(p3, 
                          bottom = textGrob("Experimental day", 
                                            gp = gpar(fontsize = 13)))
-p3.h <- ggarrange(p3.an, leg.h, ncol = 1, align = "h", heights = c(3, 0.2))
 
 
-ggsave("Plots/Dec2023/rates_20231219-no.png",p3.an, dpi = 300, bg = "white")
+ggsave("Plots/Jan2024/rates_20240112.png",p3.an, dpi = 300, bg = "white")
 
 
