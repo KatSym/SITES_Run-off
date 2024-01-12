@@ -33,7 +33,7 @@ env <- envir %>%
 dat <- data %>% 
   relocate(c(MF_Ir, HF_Ir, MF_Gr, HF_Gr), .after = biovol_MF) %>% 
   # log(x + 1) transormed
-    mutate(across(4:16, mytr),
+    mutate(across(4:12, mytr),
            ExpDay = factor(ExpDay)) 
 
 # take out day 5
