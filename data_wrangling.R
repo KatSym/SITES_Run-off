@@ -253,6 +253,22 @@ Dnut <- read_xlsx("Data/TOC_TN_DOC_DN_Erken_Bolmen_20230223.xlsx",
                             Day == 5 ~ 20,
                             Day == 9 ~ 36))
 
+# dissolved nutrients
+dis.nut <- read_xlsx("Data/NO3_NO2_PO4_Erken_Bolmen_20230315.xlsx",
+                     sheet = "Erken",
+                     range = "A4:E111",
+                     col_names = T) %>% 
+  filter(`Sample nr` %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16)) 
+  
+
+dis.nut[dis.nut == "<0,5"] <- NA
+dis.nut[dis.nut == "<3"] <- NA
+
+dis.nut <- dis.nut %>% 
+  mutate(Mes_ID = as.numeric(`Sample nr`),
+         NO3 = as.numeric(`µg/L...3`),
+         NO2 = as.numeric(`µg/L...4`),
+         PO4 = as.numeric(`µg/L...5`), .keep = "unused") 
 
 # Sensor data
 backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
@@ -358,7 +374,8 @@ rot <-  rotifers %>%
 
 
 envir <- full_join(Dnut, TP_Chla, by = c("Mes_ID", "ExpDay")) %>% 
-  # TP & Chla in ug/L, other nutr in mg/L
+  # TP, Chla NO3, NO2, PO4 in ug/L, other nutr in mg/L
+  full_join(., dis.nut, by = c("Mes_ID", "ExpDay")) %>%
   full_join(., absorbance, by = c("Mes_ID", "ExpDay")) %>%
   full_join(., backg, by = c("Mes_ID", "ExpDay")) %>%
   mutate(Treatment = substring(Mesocosm, 1, 1),
