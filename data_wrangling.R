@@ -268,7 +268,8 @@ dis.nut <- dis.nut %>%
   mutate(Mes_ID = as.numeric(`Sample nr`),
          NO3 = as.numeric(`µg/L...3`),
          NO2 = as.numeric(`µg/L...4`),
-         PO4 = as.numeric(`µg/L...5`), .keep = "unused") 
+         PO4 = as.numeric(`µg/L...5`), .keep = "unused") %>% 
+  rename(ExpDay = Day)
 
 # Sensor data
 backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
@@ -423,6 +424,6 @@ data = dat %>%
 save(data, envir, rot, trt.cols, file = "all_data.RData")
 
 # write csvs
-write.csv(data, "Data/microscope_data_topub.csv", row.names = F)
-write.csv(envir, "Data/envir_data_topub.csv", row.names = F)
-write.csv(rot, "Data/rotifer_data_topub.csv", row.names = F)
+# write.csv(data, "Data/microscope_data_topub.csv", row.names = F)
+# write.csv(envir, "Data/envir_data_topub.csv", row.names = F)
+# write.csv(rot, "Data/rotifer_data_topub.csv", row.names = F)
