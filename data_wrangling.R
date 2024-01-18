@@ -65,7 +65,7 @@ size.dat <- read_xlsx("Data/SITES_microscope_data_working.xlsx",
   mutate(letter = rep(c("h", "d"), 1026)) %>% 
   pivot_wider(names_from = letter, values_from = Length) %>% 
   unnest(cols = c(h, d)) %>% 
-  mutate(vol = (pi/6)*d^2*h, # prolate spheroid in um^3
+  mutate(vol = (pi/6)*d^2*h, # prolate spheroid in µm³
          Ccont = 0.216*vol^0.939, # Menden-Deuer & Lessard 2000, all non-diatom protists
          Incubation = as.numeric(substring(inc, 3, 3)),
          Treatment = factor(substring(Bag, 1, 1), levels = c("C","D","I","E")),
@@ -144,12 +144,13 @@ dat <- partial_dat %>%
 
 dat$aMFc[dat$aMFc<0] <- 0
 
+# get biovolume and biomass
 bdat <- dat %>%
   select(Incubation, Treatment, Mes_ID, Replicate, aHF, aMFc, aPF) %>%
   pivot_longer(cols = c(aHF, aPF, aMFc), names_to = "agroup", values_to = "abundance") %>%
   mutate(GROUP = substring(agroup, 2, 3))  %>%
   inner_join(., sz.data, by = c("Incubation", "Treatment", "GROUP")) %>%
-  mutate(biovol = abundance *mean.cell.vol,
+  mutate(biovol = abundance * mean.cell.vol, # µm³/mL
          biomass = abundance * (0.216*mean.cell.vol^0.939)) %>%  # Menden-Deuer Lessard 2000, pgC/mL
   select(Incubation, Treatment, Mes_ID, Replicate, GROUP, biomass, biovol) %>%
   pivot_wider(names_from = GROUP, values_from =c(biomass, biovol), values_fn = mean)
