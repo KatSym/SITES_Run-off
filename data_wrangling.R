@@ -268,8 +268,13 @@ dis.nut <- dis.nut %>%
   mutate(Mes_ID = as.numeric(`Sample nr`),
          NO3 = as.numeric(`µg/L...3`),
          NO2 = as.numeric(`µg/L...4`),
-         PO4 = as.numeric(`µg/L...5`), .keep = "unused") %>% 
-  rename(ExpDay = Day)
+         PO4 = as.numeric(`µg/L...5`),
+         ExpDay = case_when(Day == 0 ~ 0,
+                            Day == 1 ~ 4,
+                            Day == 2 ~ 8,
+                            Day == 3 ~ 12,
+                            Day == 5 ~ 20,
+                            Day == 9 ~ 36), .keep = "unused") 
 
 # Sensor data
 backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
@@ -391,7 +396,7 @@ envir <- full_join(Dnut, TP_Chla, by = c("Mes_ID", "ExpDay")) %>%
   # keep only relevant mesocosms and time period
   filter(Mes_ID %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16),
          ExpDay<=21) %>% 
-  select(-c(A254_5, A420_5, A254_1, A420_1, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy, Temp)) %>% 
+  select(-c(A254_5, A420_5, A254_1, A420_1, Trilux_Neph, Trilux_Chloro, Trilux_Phycocy)) %>% 
   as.data.frame()
 #### NOTE! The env data don't match with my data on experimental day. They are a day before,
 #### so change it to be the same depending on the analysis
