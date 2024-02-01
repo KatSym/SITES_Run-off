@@ -5,9 +5,6 @@ library(tidybayes)
 library(modelr)
 library(emmeans)
 
-library(ggpubr)
-library(grid)
-
 
 # all models in Bayes
 
@@ -21,7 +18,7 @@ mytr <- function(x){
 # all days 
 # no transformation
 env <- envir %>% 
-  select(-c(TOC, DN, DOsat, DOconc)) %>% 
+  # select(-c(TOC, DN, DOsat, DOconc)) %>% 
   relocate(c(ExpDay, Treatment), .before = Mes_ID) %>% 
   mutate(Nutr = TN*1000 + TP,
          # across(DOC:Nutr, scale),
@@ -31,6 +28,7 @@ env <- envir %>%
                 ExpDay = factor(ExpDay))
   
 dat <- data %>% 
+  select(-contains("biomass")) %>% 
   relocate(c(MF_Ir, HF_Ir, MF_Gr, HF_Gr), .after = biovol_MF) %>% 
   # log(x + 1) transormed
     mutate(across(4:12, mytr),
@@ -282,6 +280,143 @@ summary(pTrDay, point = "mean")
 summary(pDayTr, point = "mean")
 
 
+no3.m = brm(bf(NO3 ~ 
+                + Treatment*ExpDay
+              + (1|Mes_ID)),
+           family = lognormal(link = "identity"),
+           chains = 4,
+           iter = 2000,
+           cores = 4,
+           control = list(adapt_delta = 0.99
+                          # max_treedepth = 12,
+                          # step_size = 0.2
+                          ),
+           seed = 543,
+           backend = "cmdstanr", 
+           data = env %>% filter(!is.na(NO3)),
+           file = "models/240119_NO3",
+           file_refit = "on_change"
+)
+pp_check(no3.m)
+summary(no3.m)
+conditional_effects(no3.m, effects = "Treatment:ExpDay")
+conditional_effects(no3.m, effects = "ExpDay:Treatment")
+
+emTrDay = emmeans(no3.m, ~ Treatment|ExpDay)
+summary(emTrDay, point = "mean")
+pTrDay = pairs(emTrDay)
+
+emDayTr = emmeans(no3.m, ~ ExpDay|Treatment)
+summary(emDayTr, point = "mean")
+pDayTr = pairs(emDayTr)
+
+summary(pTrDay, point = "mean")
+summary(pDayTr, point = "mean")
+
+no2.m = brm(bf(NO2 ~ 
+                + Treatment*ExpDay
+              + (1|Mes_ID)),
+           family = gaussian(link = "identity"),
+           chains = 4,
+           iter = 2000,
+           cores = 4,
+           control = list(adapt_delta = 0.99
+                          # max_treedepth = 12,
+                          # step_size = 0.2
+           ),
+           seed = 543,
+           backend = "cmdstanr", 
+           data = env %>% filter(!is.na(NO2)),
+           file = "models/240201_NO2",
+           file_refit = "on_change"
+)
+pp_check(no2.m)
+summary(no2.m)
+conditional_effects(no2.m, effects = "Treatment:ExpDay")
+conditional_effects(no2.m, effects = "ExpDay:Treatment")
+
+emTrDay = emmeans(no2.m, ~ Treatment|ExpDay)
+summary(emTrDay, point = "mean")
+pTrDay = pairs(emTrDay)
+
+emDayTr = emmeans(no2.m, ~ ExpDay|Treatment)
+summary(emDayTr, point = "mean")
+pDayTr = pairs(emDayTr)
+
+summary(pTrDay, point = "mean")
+summary(pDayTr, point = "mean")
+
+
+nh.m = brm(bf(NH4 ~ 
+                + Treatment*ExpDay
+              + (1|Mes_ID)),
+           family = gaussian(link = "identity"),
+           chains = 4,
+           iter = 2000,
+           cores = 4,
+           control = list(adapt_delta = 0.99
+                          # max_treedepth = 12,
+                          # step_size = 0.2
+           ),
+           seed = 543,
+           backend = "cmdstanr", 
+           data = env %>% filter(!is.na(NH4)),
+           file = "models/240201_NH4",
+           file_refit = "on_change"
+)
+pp_check(nh.m)
+summary(nh.m)
+conditional_effects(nh.m, effects = "Treatment:ExpDay")
+conditional_effects(nh.m, effects = "ExpDay:Treatment")
+
+emTrDay = emmeans(nh.m, ~ Treatment|ExpDay)
+summary(emTrDay, point = "mean")
+pTrDay = pairs(emTrDay)
+
+emDayTr = emmeans(nh.m, ~ ExpDay|Treatment)
+summary(emDayTr, point = "mean")
+pDayTr = pairs(emDayTr)
+
+summary(pTrDay, point = "mean")
+summary(pDayTr, point = "mean")
+
+
+
+po.m = brm(bf(PO4 ~ 
+                + Treatment*ExpDay
+              + (1|Mes_ID)),
+           family = lognormal(link = "identity"),
+           chains = 4,
+           iter = 2000,
+           cores = 4,
+           control = list(adapt_delta = 0.99
+                          # max_treedepth = 12,
+                          # step_size = 0.2
+                          ),
+           seed = 543,
+           backend ="cmdstanr", 
+           data = env %>% filter(!is.na(PO4)),
+           file = "models/240201_PO4",
+           # file_refit = "on_change"
+)
+pp_check(po.m)
+summary(po.m)
+conditional_effects(po.m, effects = "Treatment:ExpDay")
+conditional_effects(po.m, effects = "ExpDay:Treatment")
+
+emTrDay = emmeans(po.m, ~ Treatment|ExpDay)
+summary(emTrDay, point = "mean")
+pTrDay = pairs(emTrDay)
+
+emDayTr = emmeans(po.m, ~ ExpDay|Treatment)
+summary(emDayTr, point = "mean")
+pDayTr = pairs(emDayTr)
+
+summary(pTrDay, point = "mean")
+summary(pDayTr, point = "mean")
+
+
+
 ## rotifers ----
 rot.m = brm(bf(log1p(Rotif) ~ 
                  + Treatment*ExpDay
@@ -343,7 +478,7 @@ summary(pppp, point = "mean")
 
 dddd1 = emmeans(bact.m, ~ ExpDay|Treatment)
 summary(dddd1, point = "mean")
-pppp1 = pairs(dddd1)
+pppp1 = pairs(dddd1, reverse = T)
 summary(pppp1, point = "mean")
 
 # cyanobacteria
