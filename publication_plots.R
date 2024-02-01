@@ -33,7 +33,7 @@ Treats <- read_xlsx("Data/SITES_experiment_planning.xlsx",
 # Same dataframe with the one that was used in the models, but here ExpDay is
 # is numeric and not a factor
 nutr = envir %>% 
-  select(-c(TOC, DN, DOsat, DOconc)) %>% 
+  # select(-c(TOC, DN, DOsat, DOconc)) %>% 
   relocate(c(ExpDay, Treatment), .before = Mes_ID)
 
 # general theme
@@ -129,7 +129,10 @@ abs.m <-  brm(file = "models/231029_abs")
 chla.m <- brm(file = "models/231204_chla")
 tn.m <-  brm(file = "models/231120_TN")
 tp.m <-  brm(file = "models/231120_TP")
-
+no3.m <- brm(file = "models/240119_NO3")
+no2.m <- brm(file = "models/240201_NO2")
+nh.m <- brm(file = "models/240201_NH4")
+po.m <- brm(file = "models/240201_PO4")
 
 
 par.pl <- nutr %>% 
@@ -255,6 +258,126 @@ tp.pl <- nutr %>%
          <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
        x = NULL)
 
+no3.pl <- nutr %>% 
+  filter(!is.na(NO3)) %>% 
+  group_by(Mes_ID,ExpDay, Treatment) %>% 
+  add_epred_draws(no3.m,
+                  re_formula = NA
+  ) %>% 
+  ggplot(., aes(x = ExpDay,
+                y = NO3,
+                colour = Treatment
+  )) +
+  stat_lineribbon(aes(y = (.epred)),
+                  .width = 0,
+                  position = position_dodge(.5),
+                  size = .8
+  )+
+  stat_pointinterval(aes(y = (.epred)),
+                     .width = c(0.95),
+                     linewidth = 2,
+                     show.legend = FALSE
+  )+
+  scale_color_manual(values = trt.cols)+
+  matheme+
+  theme(
+    axis.title.y = ggtext::element_markdown(),
+  ) +
+  labs(y = "<span style='font-size: 15pt'>NO3</span>
+         <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
+       x = "Experimental day")
+
+
+no2.pl <- nutr %>% 
+  filter(!is.na(NO2)) %>% 
+  group_by(Mes_ID,ExpDay, Treatment) %>% 
+  add_epred_draws(no2.m,
+                  re_formula = NA
+  ) %>% 
+  ggplot(., aes(x = ExpDay,
+                y = NO2,
+                colour = Treatment
+  )) +
+  stat_lineribbon(aes(y = (.epred)),
+                  .width = 0,
+                  position = position_dodge(.5),
+                  size = .8
+  )+
+  stat_pointinterval(aes(y = (.epred)),
+                     .width = c(0.95),
+                     linewidth = 2,
+                     show.legend = FALSE
+  )+
+  scale_color_manual(values = trt.cols)+
+  matheme+
+  theme(
+    axis.title.y = ggtext::element_markdown(),
+  ) +
+  labs(y = "<span style='font-size: 15pt'>NO2</span>
+         <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
+       x = "Experimental day")
+
+nh.pl <- nutr %>% 
+  filter(!is.na(NH4)) %>% 
+  group_by(Mes_ID,ExpDay, Treatment) %>% 
+  add_epred_draws(nh.m,
+                  re_formula = NA
+  ) %>% 
+  ggplot(., aes(x = ExpDay,
+                y = NH4,
+                colour = Treatment
+  )) +
+  stat_lineribbon(aes(y = (.epred)),
+                  .width = 0,
+                  position = position_dodge(.5),
+                  size = .8
+  )+
+  stat_pointinterval(aes(y = (.epred)),
+                     .width = c(0.95),
+                     linewidth = 2,
+                     show.legend = FALSE
+  )+
+  scale_color_manual(values = trt.cols)+
+  matheme+
+  theme(
+    axis.title.y = ggtext::element_markdown(),
+  ) +
+  labs(y = "<span style='font-size: 15pt'>NH4</span>
+         <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
+       x = "Experimental day")
+
+
+
+po.pl <- nutr %>% 
+  filter(!is.na(PO4)) %>% 
+  group_by(Mes_ID,ExpDay, Treatment) %>% 
+  add_epred_draws(po.m,
+                  re_formula = NA
+  ) %>% 
+  ggplot(., aes(x = ExpDay,
+                y = PO4,
+                colour = Treatment
+  )) +
+  stat_lineribbon(aes(y = (.epred)),
+                  .width = 0,
+                  position = position_dodge(.5),
+                  size = .8
+  )+
+  stat_pointinterval(aes(y = (.epred)),
+                     .width = c(0.95),
+                     linewidth = 2,
+                     show.legend = FALSE
+  )+
+  scale_color_manual(values = trt.cols)+
+  matheme+
+  theme(
+    axis.title.y = ggtext::element_markdown(),
+  ) +
+  labs(y = "<span style='font-size: 15pt'>PO4</span>
+         <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
+       x = "Experimental day")
+
+
 
 chla.pl <- nutr %>% 
   filter(!is.na(Chla)) %>% 
@@ -301,6 +424,17 @@ p.bckg
 ggsave("Plots/Jan2024/background_1812.png", dpi = 300, bg = "white", width = 13)
 
 
+diss.nut <- ggarrange(no3.pl+ rremove("xlab"),
+                      nh.pl+ rremove("xlab"), 
+                      po.pl+ rremove("xlab"),  
+                      ncol = 3, nrow = 1, align = "h",
+                      labels = "auto", font.label = list(size = 15)
+                      # ,common.legend = T, legend.grob = get_legend(leg.h), legend = "top"
+) 
+diss.nut <- annotate_figure(diss.nut, 
+                          bottom = textGrob("Experimental day", gp = gpar(fontsize = 15)))
+
+ggsave("Plots/Jan2024/diss-nutr.png", dpi = 300, bg = "white")
 
 # Fig. 2 - bacterial abundance ======
 
@@ -385,7 +519,7 @@ p2.1 <- ggarrange(cyan,  bact,
 )
 
 
-ggsave("Plots/Jan2024/bact.tiff", p2.1, dpi=300, bg = "white")
+ggsave("Plots/Jan2024/bact.png", p2.1, dpi=300, bg = "white")
 
 
 ## Fig. 3 - nanoflagellate abundance and bovolume ----
