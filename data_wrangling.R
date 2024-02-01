@@ -9,8 +9,6 @@ trt.cols <- c(`C`= "#000000", #black - C
               `E`= "#e84855") #r - E
 
 
-
-
 ## MICROSCOPE DATA ======
 
 ### ABUNDANCE ----
@@ -203,9 +201,8 @@ absorbance <- read_xlsx("Data/Erken DOM absorbence data.xlsx",
          A254_5 = `Abs. 254 (5cm)`,
          A420_1 = `Abs. 420 (1 cm)`,
          A254_1 = `Abs. 254 (1 cm)`,
-         Mesocosm = `Treatment ID`,
          ExpDay = Day) %>% 
-  select(-Date) %>% 
+  select(-Date, -`Treatment ID`) %>% 
   mutate(Mes_ID = as.numeric(Mes_ID),
          # use the 5cm cuvette and convert to m
          a420 = 100*A420_5/5)
@@ -254,27 +251,38 @@ Dnut <- read_xlsx("Data/TOC_TN_DOC_DN_Erken_Bolmen_20230223.xlsx",
                             Day == 9 ~ 36))
 
 # dissolved nutrients
-dis.nut <- read_xlsx("Data/NO3_NO2_PO4_Erken_Bolmen_20230315.xlsx",
-                     sheet = "Erken",
-                     range = "A4:E111",
-                     col_names = T) %>% 
-  filter(`Sample nr` %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16)) 
-  
 
-dis.nut[dis.nut == "<0,5"] <- NA
-dis.nut[dis.nut == "<3"] <- NA
+dis.nut <- read_xlsx("Data/2022_nutrient_data_summary.xlsx",
+                      sheet = 1,
+                      range = "A1:Q103",
+                      col_names = T) %>% 
+  separate(`Mesocosm ID`, into = c("mes", "Mes_ID"), sep = " ") %>% 
+  mutate(Mes_ID = as.integer(Mes_ID),
+         ExpDay = case_when(`Sampling day` == 0 ~ 0,
+                            `Sampling day` == 1 ~ 4,
+                            `Sampling day` == 2 ~ 8,
+                            `Sampling day` == 3 ~ 12,
+                            `Sampling day` == 5 ~ 20,
+                            `Sampling day` == 9 ~ 36)) %>% 
+  filter(Site == "Erken", 
+         Mes_ID != "Lake") %>% 
+  rename(TP = `TP (ug/L)`,
+         Chla = `Klorofyll a (µg/l)`,
+         TOC = `TOC (mg/L)`,
+         TN = `TN (mg/L)`,
+         DOC = `DOC (mg/L)`,
+         dTN = `diss TN (mg/L)`,
+         PO4 = `PO4 (ug/L)`,
+         NO3 = `NO3 (ug/L)`,
+         NO2 = `NO2 (ug/L)`,
+         NH4 = `NH4 (ug/L)`) %>% 
+select(ExpDay, Mes_ID, TP, Chla, TOC, TN, DOC, dTN, PO4, NO3, NO2, NH4)
 
-dis.nut <- dis.nut %>% 
-  mutate(Mes_ID = as.numeric(`Sample nr`),
-         NO3 = as.numeric(`µg/L...3`),
-         NO2 = as.numeric(`µg/L...4`),
-         PO4 = as.numeric(`µg/L...5`),
-         ExpDay = case_when(Day == 0 ~ 0,
-                            Day == 1 ~ 4,
-                            Day == 2 ~ 8,
-                            Day == 3 ~ 12,
-                            Day == 5 ~ 20,
-                            Day == 9 ~ 36), .keep = "unused") 
+# assing something when values are below ditection limit
+dis.nut[dis.nut == "<0,5"] <- "0.1"  
+dis.nut[dis.nut == "<1"] <- "0.5"
+dis.nut[dis.nut == "<3"] <- "2"
+dis.nut[dis.nut == "NO RESULT"] <- NA 
 
 # Sensor data
 backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
@@ -315,7 +323,8 @@ backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
     Treatment = case_when(Mes_ID == 1 | Mes_ID == 7 | Mes_ID == 10 | Mes_ID == 16 ~ "C",
                           Mes_ID == 2 | Mes_ID == 8 | Mes_ID == 11 | Mes_ID == 13 ~ "D",
                           Mes_ID == 3 | Mes_ID == 5 | Mes_ID == 12 | Mes_ID == 14 ~ "I",
-                          Mes_ID == 4 | Mes_ID == 6 | Mes_ID == 9 | Mes_ID == 15 ~ "E")
+                          Mes_ID == 4 | Mes_ID == 6 | Mes_ID == 9 | Mes_ID == 15 ~ "E"),
+    .keep = "unused"
   ) 
 
 ## ROTIFERS ====
@@ -379,19 +388,17 @@ rot <-  rotifers %>%
 # put it all together
 
 
-envir <- full_join(Dnut, TP_Chla, by = c("Mes_ID", "ExpDay")) %>% 
-  # TP, Chla NO3, NO2, PO4 in ug/L, other nutr in mg/L
-  full_join(., dis.nut, by = c("Mes_ID", "ExpDay")) %>%
-  full_join(., absorbance, by = c("Mes_ID", "ExpDay")) %>%
+envir <- 
+   # # TP, Chla, NO3, NO2, PO4 in ug/L, other nutr in mg/L
+  full_join(dis.nut, absorbance, by = c("Mes_ID", "ExpDay")) %>%
   full_join(., backg, by = c("Mes_ID", "ExpDay")) %>%
-  mutate(Treatment = substring(Mesocosm, 1, 1),
-         Treatment = case_when(Mes_ID == 1 | Mes_ID == 7 | Mes_ID == 10 | Mes_ID == 16 ~ "C",
+  mutate(Treatment = case_when(Mes_ID == 1 | Mes_ID == 7 | Mes_ID == 10 | Mes_ID == 16 ~ "C",
                                Mes_ID == 2 | Mes_ID == 8 | Mes_ID == 11 | Mes_ID == 13 ~ "D",
                                Mes_ID == 3 | Mes_ID == 5 | Mes_ID == 12 | Mes_ID == 14 ~ "I",
                                Mes_ID == 4 | Mes_ID == 6 | Mes_ID == 9 | Mes_ID == 15 ~ "E"),
          suva = (A254_1/DOC)*100) %>% # L/mg*m
-  select(-contains("id", ignore.case = F), -contains("Date"), -Day, -TIMESTAMP, -Mesocosm) %>% 
-  filter(!is.na(Mes_ID)) %>% 
+  # select(-contains("id", ignore.case = F), -contains("Date")) %>% 
+  # filter(!is.na(Mes_ID)) %>% 
   arrange(ExpDay) %>% 
   # keep only relevant mesocosms and time period
   filter(Mes_ID %in% c(1, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16),
@@ -411,7 +418,7 @@ data = dat %>%
                             Incubation == 3 ~ 21)) %>% 
   left_join(., GR1, by = c("Incubation", "Treatment", "Mes_ID", "Replicate")) %>% 
   left_join(., bdat, by = c("Incubation", "Treatment", "Mes_ID", "Replicate")) %>% 
-  select(-contains(".x"), -contains("Tend"), -contains("corr"), -contains("biomass"), -id, -Sample) %>% 
+  select(-contains(".x"), -contains("Tend"), -contains("corr"), -id, -Sample) %>% 
   mutate(Mes_ID = as.numeric(as.character(Mes_ID))) %>%
   rename(MF_Ir = MFir.y,
          HF_Ir = HFir.y, 
