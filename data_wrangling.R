@@ -278,11 +278,15 @@ dis.nut <- read_xlsx("Data/2022_nutrient_data_summary.xlsx",
          NH4 = `NH4 (ug/L)`) %>% 
 select(ExpDay, Mes_ID, TP, Chla, TOC, TN, DOC, dTN, PO4, NO3, NO2, NH4)
 
-# assing something when values are below ditection limit
+# assign something when values are below ditection limit
 dis.nut[dis.nut == "<0,5"] <- "0.1"  
 dis.nut[dis.nut == "<1"] <- "0.5"
 dis.nut[dis.nut == "<3"] <- "2"
 dis.nut[dis.nut == "NO RESULT"] <- NA 
+
+dis.nut <- dis.nut %>% mutate(PO4 = as.numeric(PO4),
+                              NO2 = as.numeric(NO2),
+                              NH4 = as.numeric(NH4))
 
 # Sensor data
 backg <- read.csv("Data/Erken_Daily_avg_final_new_clean.csv",
