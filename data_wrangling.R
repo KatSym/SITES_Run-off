@@ -429,17 +429,34 @@ data = dat %>%
          PF_abund = aPF,
          HF_abund = aHF,
          MF_abund = aMFc,
+         HF_biovol = biovol_HF,
+         PF_biovol = biovol_PF,
+         MF_biovol = biovol_MF,
          MF_Gr = Gm,
          HF_Gr = Gh,
          Mesocosm = Mesocosm.y) %>% 
   as.data.frame() %>% 
-  select(-contains(".y"), -c(MF, aMF, PF, HF, Replicate, Incubation, Mesocosm)) %>% 
-  relocate(ExpDay, .before = Treatment)
+  select(-contains(".y"),-contains("biomass"), -c(MF, aMF, PF, HF, Replicate, Incubation, Mesocosm, FLB_perc)) %>% 
+  relocate(ExpDay, .before = Treatment) %>% 
+  relocate(contains("Ir"), .before = contains("Gr")) %>%
+  relocate(contains("biovol"), .after = contains("abund"))
 
 # save the above data frame and the colours so you don't have to run all this every time
 save(data, envir, rot, trt.cols, file = "all_data.RData")
 
+
+
 # write csvs
+# 
+# d1 <- data %>% 
+#   select(-contains("biomass"), -FLB_perc) %>% 
+#   rename(HF_biovol = biovol_HF,
+#          PF_biovol = biovol_PF,
+#          MF_biovol = biovol_MF) %>% 
+#   relocate(contains("Ir"), .before = contains("Gr")) %>% 
+#   relocate(contains("biovol"), .after = contains("abund"))
+# 
+# write.csv(d1, "Data/nanoflagellate_data_topub.csv", row.names = F)
 # write.csv(data, "Data/microscope_data_topub.csv", row.names = F)
 # write.csv(envir, "Data/envir_data_topub.csv", row.names = F)
 # write.csv(rot, "Data/rotifer_data_topub.csv", row.names = F)

@@ -14,9 +14,8 @@ mytr <- function(x){
 }
 
 dat <- data %>% 
-  relocate(c(MF_Ir, HF_Ir, MF_Gr, HF_Gr), .after = biovol_MF) %>% 
   # log(x + 1) transormed
-  mutate(across(4:12, mytr),
+  mutate(across(4:11, mytr),
          ExpDay = factor(ExpDay)) 
 
 # take out day 5
@@ -82,14 +81,6 @@ leg.h <- ggplot(dat, aes(x = ExpDay, y = PF_abund, color = Treatment))+
 # make a two-line horizontal legend
 leg.h2 <- leg.h +
   guides(colour = guide_legend(ncol=2, nrow=2, byrow=TRUE, override.aes = list(size=4)))
-
-
-#colours
-trt.cols <- c(`C`= "#000000", #black - C
-              `D`= "#0a8754", #g - D
-              `I`= "#4472ca", #blu - I
-              `E`= "#e84855") #r - E
-
 
 
 
@@ -158,10 +149,14 @@ par.pl <- nutr %>%
                      show.legend = FALSE
   )+
   scale_color_manual(values = trt.cols)+
+  # scale_x_continuous(expand = c(0,0))+
   matheme+
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
+  # geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
   labs(y = "<span style='font-size: 15pt'>PAR</span>
          <span style='font-size: 12pt'>(μmol m\u207b\u00b2 s\u207b\u00b9)</span>",
        x = "Experimental day")
@@ -189,10 +184,14 @@ abs.pl <- nutr %>%
                      show.legend = FALSE
   )+
   scale_color_manual(values = trt.cols)+
+  scale_x_continuous(expand = c(0,0))+
   matheme+
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
+  # geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
   labs(y = "<span style='font-size: 15pt'>Abs<sub>420</sub></span>
          <span style='font-size: 12pt'>(m\u207b\u00b9)</span>",
        x = "Experimental day")
@@ -220,10 +219,14 @@ tn.pl <- nutr %>%
                      show.legend = FALSE
   )+
   scale_color_manual(values = trt.cols)+
+  xlim(0, 21)+
   matheme+
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
+  # geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
   labs(y = "<span style='font-size: 15pt'>Total&nbsp;nitrogen</span>
          <span style='font-size: 12pt'>(mg L\u207b\u00b9)</span>",
        x = NULL)
@@ -250,10 +253,14 @@ tp.pl <- nutr %>%
                      show.legend = FALSE
   )+
   scale_color_manual(values = trt.cols)+
+  xlim(0, 21)+
   matheme+
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
+  # geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+  # geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
   labs(y = "<span style='font-size: 15pt'>Total  phosphorus</span>
          <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
        x = NULL)
@@ -279,10 +286,14 @@ no3.pl <- nutr %>%
                      show.legend = FALSE
   )+
   scale_color_manual(values = trt.cols)+
+  scale_x_continuous(expand = c(0,0))+
   matheme+
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
+  geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+  geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+  geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
   labs(y = "<span style='font-size: 15pt'>NO3</span>
          <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
        x = "Experimental day")
@@ -309,11 +320,13 @@ no2.pl <- nutr %>%
                      show.legend = FALSE
   )+
   scale_color_manual(values = trt.cols)+
+  scale_x_continuous(expand = c(0,0))+
   matheme+
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
-  labs(y = "<span style='font-size: 15pt'>NO2</span>
+  
+  labs(y = "<span style='font-size: 15pt'>NO<sup>-</sup><sub>2</sub></span>
          <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
        x = "Experimental day")
 
@@ -338,10 +351,15 @@ nh.pl <- nutr %>%
                      show.legend = FALSE
   )+
   scale_color_manual(values = trt.cols)+
+  scale_x_continuous(expand = c(0,0))+
   matheme+
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
+  geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+  geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+  geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
+  # NH<sup>+</sup><sub>4</sub></span>
   labs(y = "<span style='font-size: 15pt'>NH4</span>
          <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
        x = "Experimental day")
@@ -369,10 +387,14 @@ po.pl <- nutr %>%
                      show.legend = FALSE
   )+
   scale_color_manual(values = trt.cols)+
+  scale_x_continuous(expand = c(0,0))+
   matheme+
   theme(
     axis.title.y = ggtext::element_markdown(),
   ) +
+  geom_vline(aes(xintercept = 5), linetype = "dashed", color = "black", alpha = 0.4)+
+  geom_vline(aes(xintercept = 13), linetype = "dashed", color = "black", alpha = 0.4)+
+  geom_vline(aes(xintercept = 21), linetype = "dashed", color = "black", alpha = 0.4)+
   labs(y = "<span style='font-size: 15pt'>PO4</span>
          <span style='font-size: 12pt'>(\u00b5g L\u207b\u00b9)</span>",
        x = "Experimental day")
@@ -410,7 +432,8 @@ chla.pl <- nutr %>%
 
 
 p.bckg <- ggarrange(treatm, par.pl + rremove("xlab"), abs.pl + rremove("xlab"),  
-                    tn.pl, tp.pl, chla.pl, 
+                    tn.pl, tp.pl, 
+                    # chla.pl, 
                     ncol = 3, nrow = 2, align = "hv",
                     labels = "auto", font.label = list(size = 15),
                     common.legend = T, legend.grob = get_legend(leg.h), legend = "top"
@@ -421,7 +444,10 @@ p.bckg <- annotate_figure(p.bckg,
 
 p.bckg
 
-ggsave("Plots/Jan2024/background_1812.png", dpi = 300, bg = "white", width = 13)
+ggsave("Plots/Jan2024/background_1503-2.png", dpi = 300, bg = "white", 
+       # width = 8, height = 5,
+       scale = 1.18
+       )
 
 
 diss.nut <- ggarrange(no3.pl+ rremove("xlab"),
@@ -429,12 +455,12 @@ diss.nut <- ggarrange(no3.pl+ rremove("xlab"),
                       po.pl+ rremove("xlab"),  
                       ncol = 3, nrow = 1, align = "h",
                       labels = "auto", font.label = list(size = 15)
-                      # ,common.legend = T, legend.grob = get_legend(leg.h), legend = "top"
+                      ,common.legend = T, legend.grob = get_legend(leg.h), legend = "top"
 ) 
 diss.nut <- annotate_figure(diss.nut, 
                           bottom = textGrob("Experimental day", gp = gpar(fontsize = 15)))
 
-ggsave("Plots/Jan2024/diss-nutr.png", dpi = 300, bg = "white")
+ggsave("Plots/Jan2024/diss-nutr_1803-1.png", dpi = 300, bg = "white")
 
 # Fig. 2 - bacterial abundance ======
 
@@ -652,7 +678,7 @@ phot.vol <- dat %>%
                   re_formula = NA,
   ) %>% 
   ggplot(., aes(x = ExpDay,
-                y = biovol_PF,
+                y = PF_biovol,
                 colour = Treatment,
   )) +
   stat_pointinterval(aes(y = (.epred)),
@@ -663,7 +689,7 @@ phot.vol <- dat %>%
   geom_point(
     data = dat,
     aes(x = ExpDay,
-        y = biovol_PF,
+        y = PF_biovol,
         colour = Treatment),
     inherit.aes = FALSE,
     position = position_jitterdodge(dodge.width = .5),
@@ -687,7 +713,7 @@ het.vol <- dat %>%
                   re_formula = NA,
   ) %>% 
   ggplot(., aes(x = ExpDay,
-                y = biovol_HF,
+                y = HF_biovol,
                 colour = Treatment,
   )) +
   stat_pointinterval(aes(y = (.epred)),
@@ -698,7 +724,7 @@ het.vol <- dat %>%
   geom_point(
     data = dat,
     aes(x = ExpDay,
-        y = biovol_HF,
+        y = HF_biovol,
         colour = Treatment),
     inherit.aes = FALSE,
     position = position_jitterdodge(dodge.width = .5),
@@ -722,7 +748,7 @@ mix.vol1 <- dat1 %>%
                   re_formula = NA,
   ) %>% 
   ggplot(., aes(x = ExpDay,
-                y = biovol_MF,
+                y = MF_biovol,
                 colour = Treatment,
   )) +
   stat_pointinterval(aes(y = (.epred)),
@@ -733,7 +759,7 @@ mix.vol1 <- dat1 %>%
   geom_point(
     data = dat1,
     aes(x = ExpDay,
-        y = biovol_MF,
+        y = MF_biovol,
         colour = Treatment),
     inherit.aes = FALSE,
     position = position_jitterdodge(dodge.width = .5),
@@ -770,7 +796,9 @@ p5.an <- annotate_figure(p5,
 # p5.h <- ggarrange(p5.an, leg.h, ncol = 1, align = "h", heights = c(3, 0.2))
 
 
-ggsave("Plots/Jan2024/abund-biov_20240112.png", p5.an,  dpi=300, bg = "white", width = 13) 
+ggsave("Plots/Jan2024/abund-biov_1503.png", p5.an,  dpi=300, bg = "white",
+       scale = 1.18
+       ) 
 
 ## Fig. 4 - ingestion and grazing rates =====
 
