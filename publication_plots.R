@@ -494,13 +494,13 @@ bact <- dat %>%
       alpha = .35) +
     scale_color_manual(values = trt.cols)+
     labs(title = "Heterotrophic bacteria",
-         y = "<span style='font-size: 15pt'>Abundance </span>
-         <span style='font-size: 13pt'>log(x+1) cells mL\u207b\u00b9</span>",
+         y = "<span style='font-size: 12pt'>Abundance </span>
+         <span style='font-size: 10pt'>log(x+1) cells mL\u207b\u00b9</span>",
          x = "Experimental Day") +
     matheme +
     theme(axis.title.y = ggtext::element_markdown(),
-          axis.title.x = element_text(size = 15),
-          plot.title = element_text(size=16, face="italic")
+          axis.title.x = element_text(size = 12),
+          plot.title = element_text(size=13, face="italic")
     ) 
 
 # cyanobacteria
@@ -528,13 +528,13 @@ cyan <- dat %>%
       alpha = .4) +
     scale_color_manual(values = trt.cols)+
     labs(title = "Cyanobacteria",
-         y = "<span style='font-size: 15pt'>Abundance </span>
-         <span style='font-size: 13pt'>log(x+1) cells mL\u207b\u00b9</span>",
+         y = "<span style='font-size: 12pt'>Abundance </span>
+         <span style='font-size: 10pt'>log(x+1) cells mL\u207b\u00b9</span>",
          x = NULL) +
     matheme +
     theme( axis.title.y = ggtext::element_markdown(),
-           axis.title.x = element_text(size = 15),
-           plot.title = element_text(size=16, face="italic")
+           axis.title.x = element_text(size = 12),
+           plot.title = element_text(size=13, face="italic")
     ) 
 
 
@@ -544,8 +544,15 @@ p2.1 <- ggarrange(cyan,  bact,
                   common.legend = T, legend.grob = get_legend(leg.h2), legend = "top"
 )
 
+p2.2 <- ggarrange(cyan,  bact + rremove("xylab"),
+                  nrow = 1, align = "h",
+                  labels = "auto", font.label = list(size = 12),
+                  common.legend = T, legend.grob = get_legend(leg.h), legend = "top"
+)
+p2.2an <- annotate_figure(p2.2, 
+                          bottom = textGrob("Experimental day", gp = gpar(fontsize = 12)))
 
-ggsave("Plots/Jan2024/bact.png", p2.1, dpi=300, bg = "white")
+ggsave("Plots/Jan2024/bact_h.png", p2.2an, dpi=300, bg = "white")
 
 
 ## Fig. 3 - nanoflagellate abundance and bovolume ----
